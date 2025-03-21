@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.lib.flutter_blue_plus">
+<!-- This file must be here to fix build errors in Flutter V2 -->
+<!-- But we intentionally leave this blank because android bluetooth permissions are
+     complicated and always changing. By leaving this blank, users can set exactly the 
+     permissions they want, without having to 'undo' the permissions we set here -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>  <!-- Android 10+ -->
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+
+    <!-- Các quyền mới trên Android 12+ -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
+
+    <!-- Chỉ cần trên Android 11+ -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
+</manifest>
