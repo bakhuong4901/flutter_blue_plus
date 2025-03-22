@@ -4,6 +4,8 @@
 
 package com.lib.flutter_blue_plus;
 
+import com.lib.flutter_blue_plus.glucose_profile_manager.*;
+
 import android.Manifest;
 import android.annotation.TargetApi;
 import android.app.Activity;
@@ -2237,6 +2239,27 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                     services.add(bmBluetoothService(gatt.getDevice(), s2, s, gatt));
                 }
             }
+            // KHƯƠNG
+            // 🩸 Tìm dịch vụ đo đường huyết (Glucose Service)
+            BluetoothGattService glucoseService = gatt.getService(GlucoseProfileConfiguration.GLUCOSE_SERVICE_UUID);
+            if (glucoseService != null) {
+                log(LogLevel.DEBUG, "✅ Dịch vụ đo đường huyết được tìm thấy!");
+                // 🔹 2. Tìm đặc tính đo đường huyết (Glucose Measurement Characteristic)
+                BluetoothGattCharacteristic glucoseMeasurementChar = glucoseService.getCharacteristic(GlucoseProfileConfiguration.GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID);
+                if (glucoseMeasurementChar != null) {
+                    log(LogLevel.DEBUG, "✅ Đặc tính đo glucose được tìm thấy!");
+                    // 🔹 3. Kích hoạt Notify để nhận dữ liệu glucose từ thiết bị
+                    setCharacteristicClientConfigDescriptor(gatt, glucoseMeasurementChar);
+
+                } else {
+                    log(LogLevel.ERROR, "❌ Không tìm thấy đặc tính đo glucose!");
+                }
+            } else {
+                log(LogLevel.ERROR, "❌ Không tìm thấy dịch vụ đo đường huyết!");
+            }
+
+
+            // KHƯƠNG
 
             // see: BmDiscoverServicesResult (Gửi sự kiện lên UI)
             HashMap<String, Object> response = new HashMap<>();
@@ -2248,6 +2271,22 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
             invokeMethodUIThread("OnDiscoveredServices", response);
         }
+
+        // KHƯƠNG (Giống với setCharacteristicClientConfigDescriptor of SUGAIOT)
+        private boolean setCharacteristicClientConfigDescriptor(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+            // Bật thông báo cho đặc tính này
+            gatt.setCharacteristicNotification(characteristic, true);
+            // Lấy descriptor CLIENT_CHARACTERISTICS_CONFIGURATION_DESCRIPTOR
+            BluetoothGattDescriptor descriptor = characteristic.getDescriptor(GlucoseProfileConfiguration.CLIENT_CHARACTERISTICS_CONFIGURATION_DESCRIPTOR);
+            if (descriptor != null) {
+                descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                gatt.writeDescriptor(descriptor);
+                log(LogLevel.DEBUG, "🔔 Đã kích hoạt thông báo cho đặc tính: " + characteristic.getUuid().toString());
+            } else {
+                log(LogLevel.ERROR, "⚠️ Không tìm thấy descriptor để kích hoạt notify!");
+            }
+        }
+        // KHƯƠNG
 
         // called for both notifications & reads
         public void onCharacteristicReceived(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value, int status) {

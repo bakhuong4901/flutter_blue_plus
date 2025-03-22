@@ -1,5 +1,7 @@
 package com.lib.flutter_blue_plus.model;
 
+import com.lib.flutter_blue_plus.model.SensorStatusAnnunciation;
+
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -120,7 +122,10 @@ public class GlucoseMeasurementRecord implements Parcelable {
         sampleLocationInteger = in.readInt();
         testBloodType = in.readString();
         sampleLocation = in.readString();
-        glucoseConcentrationMeasurementUnit = (GlucoseConcentrationMeasurementUnit) in.readSerializable();
+//        glucoseConcentrationMeasurementUnit = (GlucoseConcentrationMeasurementUnit) in.readSerializable();
+        //FIX
+        glucoseConcentrationMeasurementUnit = GlucoseConcentrationMeasurementUnit.valueOf(in.readString());
+
     }
 
     public static final Creator<GlucoseMeasurementRecord> CREATOR = new Creator<GlucoseMeasurementRecord>() {
@@ -149,6 +154,9 @@ public class GlucoseMeasurementRecord implements Parcelable {
         dest.writeInt(sampleLocationInteger);
         dest.writeString(testBloodType);
         dest.writeString(sampleLocation);
-        dest.writeSerializable(glucoseConcentrationMeasurementUnit);
+        // dest.writeSerializable(glucoseConcentrationMeasurementUnit);
+        //FIX
+        dest.writeString(glucoseConcentrationMeasurementUnit.name());
+
     }
 }
