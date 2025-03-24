@@ -302,6 +302,7 @@ class BluetoothDevice {
 
     // in order to match iOS behavior on all platforms (except web),
     // we always listen to the Services Changed characteristic if it exists.
+    // Chúng tôi luôn lắng nghe đặc điểm dịch vụ đã thay đổi nếu đặc điểm này tồn tại
     if (subscribeToServicesChanged) {
       if (!kIsWeb && !Platform.isIOS && !Platform.isMacOS) {
         BluetoothCharacteristic? c = _servicesChangedCharacteristic;

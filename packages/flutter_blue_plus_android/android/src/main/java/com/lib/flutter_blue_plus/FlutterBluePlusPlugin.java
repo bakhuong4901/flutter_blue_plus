@@ -981,24 +981,25 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                     break;
                 }
 
-                case "writeDescriptor": {
+                case "writeDescriptor": { // Ghi dữ liệu vào BLE
                     // see: BmWriteDescriptorRequest
                     HashMap<String, Object> data = call.arguments();
-                    String remoteId = (String) data.get("remote_id");
-                    String serviceUuid = (String) data.get("service_uuid");
-                    String characteristicUuid = (String) data.get("characteristic_uuid");
-                    String descriptorUuid = (String) data.get("descriptor_uuid");
+                    String remoteId = (String) data.get("remote_id"); // Địa chỉ MAC của thiết bị BLE
+                    String serviceUuid = (String) data.get("service_uuid"); //UUID của dịch vụ BLE chứa characteristic.
+                    String characteristicUuid = (String) data.get("characteristic_uuid"); //UUID của đặc tính BLE cần ghi.
+                    String descriptorUuid = (String) data.get("descriptor_uuid"); // UUID của Descriptor (cấu hình thông báo hoặc dữ liệu khác).
                     String primaryServiceUuid = (String) data.get("primary_service_uuid");
-                    byte[] value = (byte[]) data.get("value");
+                    byte[] value = (byte[]) data.get("value"); // Dữ liệu cần ghi vào Descriptor.
 
-                    // check connection
+
+                    // check connection (Kiểm tra kết nối)
                     BluetoothGatt gatt = mConnectedDevices.get(remoteId);
                     if (gatt == null) {
                         result.error("writeDescriptor", "device is disconnected", null);
                         break;
                     }
 
-                    // wait if any device is bonding (increases reliability)
+                    // wait if any device is bonding (increases reliability)  // chờ nếu có thiết bị nào đang liên kết (tăng độ tin cậy)
                     waitIfBonding();
 
                     // find characteristic
@@ -1018,7 +1019,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                         break;
                     }
 
-                    // check mtu
+                    // check mtu - Kiểm tra kích thước dữ liệu có vượt quá giới hạn MTU không
                     int mtu = mMtu.get(remoteId);
                     if ((mtu - 3) < value.length) {
                         String s = "data longer than mtu allows. dataLength: " + value.length + "> max: " + (mtu - 3);
@@ -1026,14 +1027,14 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                         break;
                     }
 
-                    // remember the data we are writing
+                    // remember the data we are writing - Lưu dữ liệu vào bộ nhớ tạm (mWriteDesc)
                     if (primaryServiceUuid == null) {
                         primaryServiceUuid = "";
                     }
                     String key = remoteId + ":" + serviceUuid + ":" + characteristicUuid + ":" + descriptorUuid + ":" + primaryServiceUuid;
                     mWriteDesc.put(key, value);
 
-                    // write descriptor
+                    // write descriptor - Ghi Descriptor vào thiết bị BLE
                     if (Build.VERSION.SDK_INT >= 33) { // Android 13 (August 2022)
 
                         int rv = gatt.writeDescriptor(descriptor, value);
@@ -2225,6 +2226,45 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
             return unexpectedEvent;
         }
 
+        // KHƯƠNG (Giống với setCharacteristicClientConfigDescriptor of SUGAIOT)
+        private boolean setCharacteristicClientConfigDescriptor(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value) {
+            // 🔹 1. Kích hoạt thông báo cho đặc tính (Bật Notify/Indicate)
+            boolean notificationSet = gatt.setCharacteristicNotification(characteristic, true);
+            if (!notificationSet) {
+                log(LogLevel.ERROR, "❌ Lỗi khi bật notify cho đặc tính: " + characteristic.getUuid().toString());
+                return false;
+            }
+
+            // 🔹 2. Lấy descriptor CCCD (Client Characteristic Configuration Descriptor)
+            BluetoothGattDescriptor descriptor = characteristic.getDescriptor(GlucoseProfileConfiguration.CLIENT_CHARACTERISTICS_CONFIGURATION_DESCRIPTOR);
+            if (descriptor != null) {
+                // 🔹 3. Gán giá trị để bật notify hoặc indicate
+                descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                log(LogLevel.DEBUG, "✅ Descriptor tìm thấy: " + descriptor.getUuid().toString());
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13+ (API 33)
+                    int status = gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                    log(LogLevel.DEBUG, "📢 writeDescriptor() trả về: " + bluetoothStatusString(status));
+                    if (status != BluetoothStatusCodes.SUCCESS) {
+                        log(LogLevel.ERROR, "❌ writeDescriptor() thất bại với mã lỗi: " + status);
+                        return false;
+                    }
+                } else { // Android 12 trở xuống
+                    if (!gatt.writeDescriptor(descriptor)) {
+                        log(LogLevel.ERROR, "❌ Ghi descriptor thất bại!");
+                        return false;
+                    }
+                }
+                log(LogLevel.DEBUG, "✅ Đã kích hoạt thông báo cho đặc tính: " + characteristic.getUuid().toString());
+                return true;
+            } else {
+                log(LogLevel.ERROR, "⚠️ Không tìm thấy descriptor để kích hoạt notify!");
+                return false;
+            }
+        }
+
+
+        // KHƯƠNG
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
@@ -2247,9 +2287,8 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 // 🔹 2. Tìm đặc tính đo đường huyết (Glucose Measurement Characteristic)
                 BluetoothGattCharacteristic glucoseMeasurementChar = glucoseService.getCharacteristic(GlucoseProfileConfiguration.GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID);
                 if (glucoseMeasurementChar != null) {
-                    log(LogLevel.DEBUG, "✅ Đặc tính đo glucose được tìm thấy!");
                     // 🔹 3. Kích hoạt Notify để nhận dữ liệu glucose từ thiết bị
-                    setCharacteristicClientConfigDescriptor(gatt, glucoseMeasurementChar);
+                    setCharacteristicClientConfigDescriptor(gatt, glucoseMeasurementChar, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
 
                 } else {
                     log(LogLevel.ERROR, "❌ Không tìm thấy đặc tính đo glucose!");
@@ -2257,9 +2296,8 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
             } else {
                 log(LogLevel.ERROR, "❌ Không tìm thấy dịch vụ đo đường huyết!");
             }
-
-
             // KHƯƠNG
+
 
             // see: BmDiscoverServicesResult (Gửi sự kiện lên UI)
             HashMap<String, Object> response = new HashMap<>();
@@ -2272,25 +2310,10 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
             invokeMethodUIThread("OnDiscoveredServices", response);
         }
 
-        // KHƯƠNG (Giống với setCharacteristicClientConfigDescriptor of SUGAIOT)
-        private boolean setCharacteristicClientConfigDescriptor(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-            // Bật thông báo cho đặc tính này
-            gatt.setCharacteristicNotification(characteristic, true);
-            // Lấy descriptor CLIENT_CHARACTERISTICS_CONFIGURATION_DESCRIPTOR
-            BluetoothGattDescriptor descriptor = characteristic.getDescriptor(GlucoseProfileConfiguration.CLIENT_CHARACTERISTICS_CONFIGURATION_DESCRIPTOR);
-            if (descriptor != null) {
-                descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                gatt.writeDescriptor(descriptor);
-                log(LogLevel.DEBUG, "🔔 Đã kích hoạt thông báo cho đặc tính: " + characteristic.getUuid().toString());
-            } else {
-                log(LogLevel.ERROR, "⚠️ Không tìm thấy descriptor để kích hoạt notify!");
-            }
-        }
-        // KHƯƠNG
 
-        // called for both notifications & reads
+        // called for both notifications & reads - gọi cho cả thông báo và đọc
         public void onCharacteristicReceived(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value, int status) {
-            // GATT Service?
+            // GATT Service? -  Dịch vụ của GATT?
             if (uuidStr(characteristic.getService().getUuid()) == "1800") {
 
                 // services changed
@@ -2300,7 +2323,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 }
             }
 
-            // has associated primary service?
+            // has associated primary service? - có dịch vụ chính liên quan không?
             BluetoothGattService primaryService = getPrimaryService(gatt, characteristic);
 
             // see: BmCharacteristicData
@@ -2321,18 +2344,98 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
         @Override
         @TargetApi(33) // newer function with byte[] value argument
+        // XỬ LÝ DỮ LIỆU ĐƯỜNG HUYẾT CỦA MÁY
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value) {
-            // this callback is only for notifications & indications
+            // this callback is only for notifications & indications - lệnh gọi lại này chỉ dành cho thông báo và chỉ dẫn
             LogLevel level = LogLevel.DEBUG;
             log(level, "onCharacteristicChanged:");
             log(level, "  chr: " + uuidStr(characteristic.getUuid()));
+            //KHƯƠNG
+            if (characteristic == null) return;
+            String charUuid = characteristic.getUuid().toString();
+            // 🔹 Xử lý dữ liệu đo glucose
+//            if (charUuid.equals(GlucoseProfileConfiguration.GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID)) {
+//                log(LogLevel.DEBUG, "📡 Nhận dữ liệu đo đường huyết...");
+//
+//                GlucoseMeasurementRecord glucoseMeasurementRecord = new GlucoseMeasurementRecord();
+//                int offset = 0;
+//
+//                // 🏷️ Đọc Flags
+//                int flag = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset);
+//                offset += 1;
+//
+//                // 🔢 Số thứ tự lần đo
+//                int sequenceNumber = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset);
+//                offset += 2;
+//                glucoseMeasurementRecord.setSequenceNumber(sequenceNumber);
+//
+//                // 🕒 Thời gian đo
+//                int year = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset);
+//                offset += 2;
+//                int month = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++);
+//                int day = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++);
+//                int hours = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++);
+//                int minutes = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++);
+//                int seconds = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++);
+//
+//                glucoseMeasurementRecord.setCalendar(new GregorianCalendar(year, month - 1, day, hours, minutes, seconds));
+//
+//                // ⏳ Time Offset
+//                int timeOffset = ((flag & (1 << 0)) > 0) ? characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset) : 0;
+//                if ((flag & (1 << 0)) > 0) offset += 2;
+//                glucoseMeasurementRecord.setTimeOffset(timeOffset);
+//
+//                // 🧪 Đơn vị đo glucose (mg/dL hoặc mmol/L)
+//                float glucoseValue = characteristic.getFloatValue(BluetoothGattCharacteristic.FORMAT_SFLOAT, offset);
+//                offset += 2;
+//
+//                if ((flag & (1 << 1)) > 0) {
+//                    glucoseMeasurementRecord.setGlucoseConcentrationMeasurementUnit(
+//                            GlucoseMeasurementRecord.GlucoseConcentrationMeasurementUnit.MOLES_PER_LITRE);
+//                } else {
+//                    glucoseMeasurementRecord.setGlucoseConcentrationMeasurementUnit(
+//                            GlucoseMeasurementRecord.GlucoseConcentrationMeasurementUnit.KILOGRAM_PER_LITRE);
+//                }
+//                glucoseMeasurementRecord.setGlucoseConcentrationValue(glucoseValue);
+//
+//                // 🩸 Loại mẫu máu & vị trí lấy mẫu
+//                int typeAndSampleLocation = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset);
+//                int sampleType = typeAndSampleLocation >> 4;
+//                int sampleLocation = typeAndSampleLocation & 0x0F;
+//                glucoseMeasurementRecord.setType(sampleType);
+//                glucoseMeasurementRecord.setSampleLocationInteger(sampleLocation);
+//                offset += 1;
+//
+//                // 🔔 Trạng thái cảm biến
+//                if ((flag & (1 << 2)) > 0) {
+//                    int sensorStatusValue = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset);
+//                    offset += 2;
+//
+//                    SensorStatusAnnunciation sensorStatusAnnunciation = new SensorStatusAnnunciation();
+//                    sensorStatusAnnunciation.setDeviceBatteryLowAtTimeOfMeasurement((sensorStatusValue & (1 << 0)) > 0);
+//                    sensorStatusAnnunciation.setSensorMalfunctionAtTimeOfMeasurement((sensorStatusValue & (1 << 1)) > 0);
+//                    sensorStatusAnnunciation.setBloodSampleInsufficientAtTimeOfMeasurement((sensorStatusValue & (1 << 2)) > 0);
+//                    sensorStatusAnnunciation.setStripInsertionError((sensorStatusValue & (1 << 3)) > 0);
+//                    sensorStatusAnnunciation.setStripTypeIncorrectForDevice((sensorStatusValue & (1 << 4)) > 0);
+//                    sensorStatusAnnunciation.setSensorResultHigherThanDeviceCanProcess((sensorStatusValue & (1 << 5)) > 0);
+//                    sensorStatusAnnunciation.setSensorResultLowerThanTheDeviceCanProcess((sensorStatusValue & (1 << 6)) > 0);
+//                    sensorStatusAnnunciation.setSensorTemperatureTooHighForValidTestResult((sensorStatusValue & (1 << 7)) > 0);
+//                    sensorStatusAnnunciation.setSensorTemperatureTooLowForValidTestResult((sensorStatusValue & (1 << 8)) > 0);
+//                    sensorStatusAnnunciation.setSensorReadInterruptedBecauseStripWasPulledTooSoon((sensorStatusValue & (1 << 9)) > 0);
+//                    sensorStatusAnnunciation.setGeneralDeviceFaultHasOccurredInSensor((sensorStatusValue & (1 << 10)) > 0);
+//                    sensorStatusAnnunciation.setTimeFaultHasOccurredInTheSensor((sensorStatusValue & (1 << 11)) > 0);
+//
+//                    glucoseMeasurementRecord.setSensorStatusAnnunciation(sensorStatusAnnunciation);
+//                }
+            //KHƯƠNG
             onCharacteristicReceived(gatt, characteristic, value, BluetoothGatt.GATT_SUCCESS);
+//            }
         }
 
         @Override
         @TargetApi(33) // newer function with byte[] value argument
         public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value, int status) {
-            // this callback is only for explicit characteristic reads
+            // this callback is only for explicit characteristic reads - lệnh gọi lại này chỉ dành cho các đặc điểm đọc rõ ràng
             LogLevel level = status == BluetoothGatt.GATT_SUCCESS ? LogLevel.DEBUG : LogLevel.ERROR;
             log(level, "onCharacteristicRead:");
             log(level, "  chr: " + uuidStr(characteristic.getUuid()));
@@ -2341,27 +2444,32 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
         }
 
         @Override
+        // Hàm này được gọi khi ghi một Characteristic thành công hoặc thất bại trên thiết bị BLE
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             LogLevel level = status == BluetoothGatt.GATT_SUCCESS ? LogLevel.DEBUG : LogLevel.ERROR;
             log(level, "onCharacteristicWrite:");
             log(level, "  chr: " + uuidStr(characteristic.getUuid()));
-            log(level, "  status: " + gattErrorString(status) + " (" + status + ")");
+            log(level, "  TRẠNG THÁI: " + gattErrorString(status) + " (" + status + ")");
 
             // For "writeWithResponse", onCharacteristicWrite is called after the remote sends back a write response.
+            // được gọi sau khi remote gửi lại phản hồi ghi
             // For "writeWithoutResponse", onCharacteristicWrite is called as long as there is still space left
+            // được gọi miễn là vẫn còn không gian trống
             // in android's internal buffer. When the buffer is full, it delays calling onCharacteristicWrite
+            // trong bộ đệm bên trong của android. Khi đầy nó sẽ trì hoãn việc gọi onCharacteristicWrite
             // until there is at least ~50% free space again.
+            // cho đến khi co ít nhất 50% không gian trống 1 lần nữa
 
             // has associated primary service?
             BluetoothGattService primaryService = getPrimaryService(gatt, characteristic);
 
-            // for convenience
+            // for convenience - thuận tiện xử lý
             String remoteId = gatt.getDevice().getAddress();
             String serviceUuid = uuidStr(characteristic.getService().getUuid());
             String characteristicUuid = uuidStr(characteristic.getUuid());
             String primaryServiceUuid = primaryService != null ? uuidStr(primaryService.getUuid()) : "";
 
-            // what data did we write?
+            // what data did we write? - cần viết những dữ liệu gì
             String key = remoteId + ":" + serviceUuid + ":" + characteristicUuid + ":" + primaryServiceUuid;
             byte[] value = mWriteChr.get(key) != null ? mWriteChr.get(key) : new byte[0];
             mWriteChr.remove(key);
@@ -2413,42 +2521,106 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
         @Override
         public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
+            // Nếu status == 0 (tương đương với BluetoothGatt.GATT_SUCCESS)
             LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
             log(level, "onDescriptorWrite:");
             log(level, "  chr: " + uuidStr(descriptor.getCharacteristic().getUuid()));
             log(level, "  desc: " + uuidStr(descriptor.getUuid()));
             log(level, "  status: " + gattErrorString(status) + " (" + status + ")");
+            // KHƯƠNG
+            if (status == BluetoothGatt.GATT_SUCCESS && gatt != null) {
+                log(LogLevel.DEBUG, "✅ Ghi CCCD thành công, chờ nhận dữ liệu...");
+                if (descriptor != null) {
+                    UUID characteristicUUID = descriptor.getCharacteristic().getUuid();
 
+                    log(LogLevel.DEBUG, "✅ onDescriptorWrite thành công cho UUID: " + characteristicUUID.toString());
+                    BluetoothGattService glucoseService = gatt.getService(GlucoseProfileConfiguration.GLUCOSE_SERVICE_UUID);
+                    // 1️⃣ Nếu là đặc tính đo glucose, tiếp tục bật Notify cho Glucose Measurement Context (nếu có)
+                    if (characteristicUUID.equals(GlucoseProfileConfiguration.GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID)) {
+                        BluetoothGattCharacteristic glucoseMeasurementContextCharacteristic = glucoseService.getCharacteristic(GlucoseProfileConfiguration.GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID);
+
+                        if (glucoseMeasurementContextCharacteristic != null) {
+                            log(LogLevel.DEBUG, "🔹 Bật Notify cho Glucose Measurement Context.");
+                            setCharacteristicClientConfigDescriptor(gatt, glucoseMeasurementContextCharacteristic, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                        } else {
+                            log(LogLevel.DEBUG, "⚠️ Không tìm thấy Glucose Measurement Context, bật Indicate cho Record Access Control Point.");
+                            BluetoothGattCharacteristic recordAccessControlPointCharacteristic = glucoseService.getCharacteristic(GlucoseProfileConfiguration.RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID);
+
+                            setCharacteristicClientConfigDescriptor(gatt, recordAccessControlPointCharacteristic, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE);
+                        }
+                    }
+
+                    // 2️⃣ Nếu là Glucose Measurement Context, tiếp tục bật Indicate cho Record Access Control Point
+                    else if (characteristicUUID.equals(GlucoseProfileConfiguration.GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID)) {
+                        BluetoothGattCharacteristic recordAccessControlPointCharacteristic = glucoseService.getCharacteristic(GlucoseProfileConfiguration.RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID);
+                        if (recordAccessControlPointCharacteristic != null) {
+                            log(LogLevel.DEBUG, "🔹 Bật Indicate cho Record Access Control Point.");
+                            setCharacteristicClientConfigDescriptor(gatt, recordAccessControlPointCharacteristic, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE);
+                        }
+                    }
+                    // 3️⃣ Nếu đã bật Indicate cho Record Access Control Point, gửi lệnh lấy dữ liệu đo đường huyết
+                    else if (characteristicUUID.equals(GlucoseProfileConfiguration.RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID)) {
+                        log(LogLevel.DEBUG, "✅ Hoàn tất cấu hình Notify/Indicate. Gửi lệnh yêu cầu dữ liệu đo đường huyết...");
+                        new Thread(() -> {
+                            try {
+                                Thread.sleep(400); // Delay 400ms để đảm bảo thiết bị BLE sẵn sàng
+
+                                BluetoothGattCharacteristic recordAccessControlPointCharacteristic = gatt.getService(GlucoseProfileConfiguration.GLUCOSE_SERVICE_UUID).getCharacteristic(GlucoseProfileConfiguration.RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID);
+
+                                if (recordAccessControlPointCharacteristic != null) {
+                                    byte[] value = new byte[2];
+                                    recordAccessControlPointCharacteristic.setValue(value);
+                                    recordAccessControlPointCharacteristic.setValue(GlucoseProfileConfiguration.OP_CODE_REPORT_STORED_RECORDS, BluetoothGattCharacteristic.FORMAT_UINT8, 0);
+                                    recordAccessControlPointCharacteristic.setValue(GlucoseProfileConfiguration.OPERATOR_ALL_RECORDS, BluetoothGattCharacteristic.FORMAT_UINT8, 1);
+
+                                    log(LogLevel.DEBUG, "📡 Gửi lệnh yêu cầu dữ liệu đo glucose...");
+                                    gatt.writeCharacteristic(recordAccessControlPointCharacteristic);
+                                    boolean success = gatt.writeCharacteristic(recordAccessControlPointCharacteristic);
+                                    log(LogLevel.DEBUG, "📡 writeCharacteristic() trả về: " + success);
+
+                                }
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }).start();
+                    }
+                } else {
+                    log(LogLevel.ERROR, "❌ onDescriptorWrite thất bại với mã lỗi: " + status);
+                }
+            } else {
+                log(LogLevel.ERROR, "❌ Ghi CCCD thất bại!");
+            }
+            // KHƯƠNG
             // has associated primary service?
             BluetoothGattService primaryService = getPrimaryService(gatt, descriptor.getCharacteristic());
 
-            // for convenience
-            String remoteId = gatt.getDevice().getAddress();
-            String serviceUuid = uuidStr(descriptor.getCharacteristic().getService().getUuid());
-            String characteristicUuid = uuidStr(descriptor.getCharacteristic().getUuid());
-            String descriptorUuid = uuidStr(descriptor.getUuid());
-            String primaryServiceUuid = primaryService != null ? uuidStr(primaryService.getUuid()) : "";
+            // for convenience - Lấy UUID của thiết bị BLE, Service, Characteristic, Descriptor
+            String remoteId = gatt.getDevice().getAddress(); // Địa chỉ MAC của thiết bị BLE.
+            String serviceUuid = uuidStr(descriptor.getCharacteristic().getService().getUuid()); // UUID của Service chứa Characteristic.
+            String characteristicUuid = uuidStr(descriptor.getCharacteristic().getUuid()); // UUID của Characteristic chứa Descriptor.
+            String descriptorUuid = uuidStr(descriptor.getUuid()); // UUID của Descriptor vừa ghi.
+            String primaryServiceUuid = primaryService != null ? uuidStr(primaryService.getUuid()) : ""; // UUID của Primary Service (nếu có).
 
-            // what data did we write?
+            // what data did we write? - Xóa dữ liệu ghi sau khi đã sử dụng
             String key = remoteId + ":" + serviceUuid + ":" + characteristicUuid + ":" + descriptorUuid + ":" + primaryServiceUuid;
             byte[] value = mWriteDesc.get(key) != null ? mWriteDesc.get(key) : new byte[0];
             mWriteDesc.remove(key);
 
             // see: BmDescriptorData
             HashMap<String, Object> response = new HashMap<>();
-            response.put("remote_id", remoteId);
-            response.put("service_uuid", serviceUuid);
-            response.put("characteristic_uuid", characteristicUuid);
-            response.put("descriptor_uuid", descriptorUuid);
-            response.put("value", value);
-            response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
-            response.put("error_code", status);
-            response.put("error_string", gattErrorString(status));
+            response.put("remote_id", remoteId); // Địa chỉ MAC của thiết bị BLE.
+            response.put("service_uuid", serviceUuid); // UUID của Service.
+            response.put("characteristic_uuid", characteristicUuid); // UUID của Characteristic.
+            response.put("descriptor_uuid", descriptorUuid); // UUID của Descriptor.
+            response.put("value", value); //Dữ liệu vừa ghi vào Descriptor.
+            response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0); // 1 nếu thành công, 0 nếu thất bại.
+            response.put("error_code", status); // Mã lỗi của BLE.
+            response.put("error_string", gattErrorString(status)); // Mô tả lỗi BLE nếu có.
             if (primaryService != null) {
-                response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
+                response.put("primary_service_uuid", uuidStr(primaryService.getUuid())); // UUID của Primary Service (nếu có).
             }
 
-            invokeMethodUIThread("OnDescriptorWritten", response);
+            invokeMethodUIThread("OnDescriptorWritten", response); // gọi method channel FLUTTER
         }
 
         @Override
@@ -2770,7 +2942,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
         BluetoothGattService service = characteristic.getService();
 
-        // is this *already* a primary service? 
+        // is this *already* a primary service?
         if (service.getType() == BluetoothGattService.SERVICE_TYPE_PRIMARY) {
             return null;
         }
