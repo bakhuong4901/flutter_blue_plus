@@ -116,15 +116,17 @@ public class GlucoseMeasurementRecord implements Parcelable {
 
     protected GlucoseMeasurementRecord(Parcel in) {
         sequenceNumber = in.readInt();
+        calendar = (GregorianCalendar) in.readSerializable();
         timeOffset = in.readInt();
         glucoseConcentrationValue = in.readFloat();
         type = in.readInt();
         sampleLocationInteger = in.readInt();
         testBloodType = in.readString();
         sampleLocation = in.readString();
-//        glucoseConcentrationMeasurementUnit = (GlucoseConcentrationMeasurementUnit) in.readSerializable();
+        sensorStatusAnnunciation = (SensorStatusAnnunciation) in.readSerializable();
+        glucoseConcentrationMeasurementUnit = (GlucoseConcentrationMeasurementUnit) in.readSerializable();
         //FIX
-        glucoseConcentrationMeasurementUnit = GlucoseConcentrationMeasurementUnit.valueOf(in.readString());
+//        glucoseConcentrationMeasurementUnit = GlucoseConcentrationMeasurementUnit.valueOf(in.readString());
 
     }
 
@@ -148,15 +150,17 @@ public class GlucoseMeasurementRecord implements Parcelable {
     @Override
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeInt(sequenceNumber);
+        parcel.writeSerializable(calendar);
         dest.writeInt(timeOffset);
         dest.writeFloat(glucoseConcentrationValue);
         dest.writeInt(type);
         dest.writeInt(sampleLocationInteger);
         dest.writeString(testBloodType);
         dest.writeString(sampleLocation);
-        // dest.writeSerializable(glucoseConcentrationMeasurementUnit);
+        parcel.writeSerializable(sensorStatusAnnunciation);
+        dest.writeSerializable(glucoseConcentrationMeasurementUnit);
         //FIX
-        dest.writeString(glucoseConcentrationMeasurementUnit.name());
+//        dest.writeString(glucoseConcentrationMeasurementUnit.name());
 
     }
 }
