@@ -30,4 +30,8 @@ android {
     if (project.android.hasProperty("namespace")) {
         namespace 'com.lib.flutter_blue_plus'
     }
+    dependencies {
+        implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.0.0'
+    }
+
 }

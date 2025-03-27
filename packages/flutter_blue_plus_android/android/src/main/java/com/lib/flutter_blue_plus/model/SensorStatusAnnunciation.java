@@ -7,18 +7,18 @@ import android.os.Parcelable;
  * glucose sensor at the time of the glucose concentration value measurement.
  */
 public class SensorStatusAnnunciation implements Parcelable {
-    private boolean deviceBatteryLowAtTimeOfMeasurement;
-    private boolean sensorMalfunctionAtTimeOfMeasurement;
-    private boolean bloodSampleInsufficientAtTimeOfMeasurement;
-    private boolean stripInsertionError;
-    private boolean stripTypeIncorrectForDevice;
-    private boolean sensorResultHigherThanDeviceCanProcess;
-    private boolean sensorResultLowerThanTheDeviceCanProcess;
-    private boolean sensorTemperatureTooHighForValidTestResult;
-    private boolean sensorTemperatureTooLowForValidTestResult;
-    private boolean sensorReadInterruptedBecauseStripWasPulledTooSoon;
-    private boolean generalDeviceFaultHasOccurredInSensor;
-    private boolean timeFaultHasOccurredInTheSensor;
+    public boolean deviceBatteryLowAtTimeOfMeasurement;
+    public boolean sensorMalfunctionAtTimeOfMeasurement;
+    public boolean bloodSampleInsufficientAtTimeOfMeasurement;
+    public boolean stripInsertionError;
+    public boolean stripTypeIncorrectForDevice;
+    public boolean sensorResultHigherThanDeviceCanProcess;
+    public boolean sensorResultLowerThanTheDeviceCanProcess;
+    public boolean sensorTemperatureTooHighForValidTestResult;
+    public boolean sensorTemperatureTooLowForValidTestResult;
+    public boolean sensorReadInterruptedBecauseStripWasPulledTooSoon;
+    public boolean generalDeviceFaultHasOccurredInSensor;
+    public boolean timeFaultHasOccurredInTheSensor;
 
     public SensorStatusAnnunciation() {
         this.deviceBatteryLowAtTimeOfMeasurement = false;

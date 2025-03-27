@@ -11,7 +11,7 @@ class FlutterBluePlus {
 
   static bool _initialized = false;
 
-  // always keep track of these device variables
+  // always keep track of these device variables - luôn theo dõi các thiết bị này
   static final Map<DeviceIdentifier, BmConnectionStateResponse> _connectionStates = {};
   static final Map<DeviceIdentifier, BmDiscoverServicesResult> _knownServices = {};
   static final Map<DeviceIdentifier, BmBondStateResponse> _bondStates = {};
@@ -26,25 +26,25 @@ class FlutterBluePlus {
   static final List<StreamSubscription> _scanSubscriptions = [];
   static final Set<DeviceIdentifier> _autoConnect = {};
 
-  /// stream used for the isScanning public api
+  /// stream used for the isScanning public api - QUÉT
   static final _isScanning = _StreamControllerReEmit<bool>(initialValue: false);
 
-  /// stream used for the scanResults public api
+  /// stream used for the scanResults public api - KẾT QỦA QUÉT
   static final _scanResults = _StreamControllerReEmit<List<ScanResult>>(initialValue: []);
 
-  /// stream used for the scanResults public api
+  /// stream used for the scanResults public api - LOGGER
   static final _logsController = StreamController<String>.broadcast();
 
-  /// buffers the scan results
+  /// buffers the scan results - ĐỆM KẾT QUẢ
   static _BufferStream<BmScanResponse>? _scanBuffer;
 
-  /// the subscription to the merged scan results stream
+  /// the subscription to the merged scan results stream - ĐĂNG KÝ VÀO LUỒNG KẾT QUẢ QUÉT ĐƯỢC HỢP NHẤT
   static StreamSubscription<BmScanResponse?>? _scanSubscription;
 
-  /// timeout for scanning that can be cancelled by stopScan
+  /// timeout for scanning that can be cancelled by stopScan - thời gian chờ quét có thể được hủy bỏ bằng stopScan
   static Timer? _scanTimeout;
 
-  /// the last known adapter state
+  /// the last known adapter state - trạng thái bộ điều hợp cuối cùng được biết đến
   static BmAdapterStateEnum? _adapterStateNow;
 
   /// FlutterBluePlus log level
@@ -56,17 +56,17 @@ class FlutterBluePlus {
 
   static LogLevel get logLevel => _logLevel;
 
-  /// Checks whether the hardware supports Bluetooth
+  /// Checks whether the hardware supports Bluetooth - Kiểm tra xem phần cứng có hỗ trợ Bluetooth không
   static Future<bool> get isSupported async => await _invokeMethod(() => FlutterBluePlusPlatform.instance.isSupported(BmIsSupportedRequest()));
 
-  /// The current adapter state
+  /// The current adapter state - Trạng thái bộ điều hợp hiện tại
   static BluetoothAdapterState get adapterStateNow =>
       _adapterStateNow != null ? _bmToAdapterState(_adapterStateNow!) : BluetoothAdapterState.unknown;
 
-  /// Return the friendly Bluetooth name of the local Bluetooth adapter
+  /// Return the friendly Bluetooth name of the local Bluetooth adapter - Trả về tên Bluetooth thân thiện của bộ điều hợp Bluetooth cục bộ
   static Future<String> get adapterName async => await _invokeMethod(() => FlutterBluePlusPlatform.instance.getAdapterName(BmBluetoothAdapterNameRequest())).then((r) => r.adapterName);
 
-  /// returns whether we are scanning as a stream
+  /// returns whether we are scanning as a stream - trả về liệu chúng ta có đang quét dưới dạng luồng hay không
   static Stream<bool> get isScanning => _isScanning.stream;
 
   /// are we scanning right now?
@@ -347,7 +347,7 @@ class FlutterBluePlus {
     }
   }
 
-  /// Stops a scan for Bluetooth Low Energy devices
+  /// Stops a scan for Bluetooth Low Energy devices - Dừng Quét các thiết bị Bluetooth năng lượng thấp
   static Future<void> stopScan() async {
     _Mutex mtx = _MutexFactory.getMutexForKey("scan");
     await mtx.take();

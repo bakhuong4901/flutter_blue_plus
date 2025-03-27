@@ -5,6 +5,8 @@
 package com.lib.flutter_blue_plus;
 
 import com.lib.flutter_blue_plus.glucose_profile_manager.*;
+import com.lib.flutter_blue_plus.model.GlucoseMeasurementRecord;
+import com.lib.flutter_blue_plus.model.SensorStatusAnnunciation;
 
 import android.Manifest;
 import android.annotation.TargetApi;
@@ -56,6 +58,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.GregorianCalendar;
 
 import java.lang.reflect.Method;
 
@@ -63,6 +66,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.embedding.engine.plugins.activity.ActivityAware;
@@ -79,6 +83,8 @@ import io.flutter.plugin.common.PluginRegistry.RequestPermissionsResultListener;
 import io.flutter.plugin.common.PluginRegistry.ActivityResultListener;
 
 public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, RequestPermissionsResultListener, ActivityResultListener, ActivityAware {
+    private final Intent bluetoothGattStateIntent = new Intent();
+
     private static final String TAG = "[FBP-Android]";
 
     private LogLevel logLevel = LogLevel.DEBUG;
@@ -443,7 +449,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                     });
                     break;
                 }
-
+                // Bắt đầu quét thiết bị
                 case "startScan": {
                     // see: BmScanSettings
                     HashMap<String, Object> data = call.arguments();
@@ -585,7 +591,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                     });
                     break;
                 }
-
+                // Dừng quét thiết bị
                 case "stopScan": {
                     BluetoothLeScanner scanner = mBluetoothAdapter.getBluetoothLeScanner();
 
@@ -2087,6 +2093,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
+        // Quản lý kết nối với các thiết bị BLE
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             try {
                 // Prevent callback thread & method call thread from writing to
@@ -2146,10 +2153,10 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                     // remove from cached PINs
                     mBondingPins.remove(remoteId);
 
-//                    // Gửi broadcast thông báo thiết bị đã ngắt kết nối
-//                    bluetoothGattStateIntent.setAction(BluetoothGattStateInformationReceiver.BLUETOOTH_LE_GATT_ACTION_DISCONNECTED_FROM_DEVICE);
-//                    bluetoothGattStateIntent.putExtra("remote_id", remoteId);
-//                    localBroadcastManager.sendBroadcast(bluetoothGattStateIntent);
+                    // Gửi broadcast thông báo thiết bị đã ngắt kết nối
+                    bluetoothGattStateIntent.setAction(BluetoothGattStateInformationReceiver.BLUETOOTH_LE_GATT_ACTION_DISCONNECTED_FROM_DEVICE);
+                    LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(context);
+                    localBroadcastManager.sendBroadcast(bluetoothGattStateIntent);
 
                     // we cannot call 'close' for autoconnected devices
                     // because it prevents autoconnect from working
@@ -2157,8 +2164,8 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                         // Tự động kết nối lại với máy
                         log(LogLevel.DEBUG, "autoconnect is true. skipping gatt.close()");
                     } else {
-                        // it is important to close after disconnection, otherwise we will
-                        // quickly run out of bluetooth resources, preventing new connections
+                        // it is important to close after disconnection, otherwise we will - Điều quan trọng là phải đóng sau khi ngắt kết nối, nếu không chúng ta sẽ
+                        // quickly run out of bluetooth resources, preventing new connections - Nhanh chóng hết tài nguyên Bluetooth, ngăn chặn các kết nối mới
                         gatt.close();
                     }
                 }
@@ -2186,19 +2193,19 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 if (mCurrentlyConnectingDevices.get(remoteId) == null && mAutoConnected.get(remoteId) == null) {
                     log(LogLevel.DEBUG, "[unexpected connection] disconnecting now");
 
-                    // this is an unexpected connection
+                    // this is an unexpected connection - đây là kết nối không mong đợi
                     unexpectedEvent = true;
 
-                    // remove from connected devices
+                    // remove from connected devices - xoá khỏi thiết bị được kết nối
                     mConnectedDevices.remove(remoteId);
 
-                    // remove from currently bonding devices
+                    // remove from currently bonding devices - xoá khỏi các thiết bị liên kết hiện tại
                     mBondingDevices.remove(remoteId);
 
-                    // remove from cached PINs
+                    // remove from cached PINs - xoá khỏi mã pin đã lưu trong bộ nhớ đệm
                     mBondingPins.remove(remoteId);
 
-                    // disconnect and close the connection straight away
+                    // disconnect and close the connection straight away - ngắt kết nối và đóng kết nối ngay lập tức
                     gatt.disconnect();
                     gatt.close();
                 }
@@ -2227,41 +2234,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
         // KHƯƠNG (Giống với setCharacteristicClientConfigDescriptor of SUGAIOT)
         private boolean setCharacteristicClientConfigDescriptor(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value) {
-//            //🔹 1. Kích hoạt thông báo cho đặc tính (Bật Notify/Indicate)
-//            boolean notificationSet = gatt.setCharacteristicNotification(characteristic, true);
-//            if (!notificationSet) {
-//                log(LogLevel.ERROR, "❌ Lỗi khi bật notify cho đặc tính: " + characteristic.getUuid().toString());
-//                return false;
-//            }
-//
-//            // 🔹 2. Lấy descriptor CCCD (Client Characteristic Configuration Descriptor)
-//            BluetoothGattDescriptor descriptor = characteristic.getDescriptor(GlucoseProfileConfiguration.CLIENT_CHARACTERISTICS_CONFIGURATION_DESCRIPTOR);
-//            if (descriptor != null) {
-//                // 🔹 3. Gán giá trị để bật notify hoặc indicate
-//                descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-//                log(LogLevel.DEBUG, "✅ Descriptor tìm thấy: " + descriptor.getUuid().toString());
-//
-//                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13+ (API 33)
-//                    int status = gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-//                    log(LogLevel.DEBUG, "📢 writeDescriptor() trả về: " + bluetoothStatusString(status));
-//                    if (status != BluetoothStatusCodes.SUCCESS) {
-//                        log(LogLevel.ERROR, "❌ writeDescriptor() thất bại với mã lỗi: " + status);
-//                        return false;
-//                    }
-//                } else { // Android 12 trở xuống
-//                    if (!gatt.writeDescriptor(descriptor)) {
-//                        log(LogLevel.ERROR, "❌ Ghi descriptor thất bại!");
-//                        return false;
-//                    }
-//                }
-//                log(LogLevel.DEBUG, "✅ Đã kích hoạt thông báo cho đặc tính: " + characteristic.getUuid().toString());
-//                return true;
-//            } else {
-//                log(LogLevel.ERROR, "⚠️ Không tìm thấy descriptor để kích hoạt notify!");
-//                return false;
-//            }
-            /// FIX PART 2
-            // Bật tính năng lắng nghe thông báo từ characteristic
+            //🔹 1. Kích hoạt thông báo cho đặc tính (Bật Notify/Indicate)
             gatt.setCharacteristicNotification(characteristic, true);
 
             // Lấy CCCD Descriptor của Characteristic (0x2902)
@@ -2359,87 +2332,97 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
             // this callback is only for notifications & indications - lệnh gọi lại này chỉ dành cho thông báo và chỉ dẫn
             LogLevel level = LogLevel.DEBUG;
             log(level, "onCharacteristicChanged:");
-            log(level, "  chr: " + uuidStr(characteristic.getUuid()));
+            log(level, " chr: " + uuidStr(characteristic.getUuid()));
+            onCharacteristicReceived(gatt, characteristic, value, BluetoothGatt.GATT_SUCCESS);
             //KHƯƠNG
             if (characteristic == null) return;
-            UUID characteristicUuid = characteristic.getUuid();
             // 🔹 Xử lý dữ liệu đo glucose
-            if (charUuid.equals(GlucoseProfileConfiguration.GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID)) {
+            LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(context);
+            if (GlucoseProfileConfiguration.GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
                 log(LogLevel.DEBUG, "📡 Nhận dữ liệu đo đường huyết...");
-//
-//                GlucoseMeasurementRecord glucoseMeasurementRecord = new GlucoseMeasurementRecord();
-//                int offset = 0;
-//
-//                // 🏷️ Đọc Flags
-//                int flag = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset);
-//                offset += 1;
-//
-//                // 🔢 Số thứ tự lần đo
-//                int sequenceNumber = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset);
-//                offset += 2;
-//                glucoseMeasurementRecord.setSequenceNumber(sequenceNumber);
-//
-//                // 🕒 Thời gian đo
-//                int year = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset);
-//                offset += 2;
-//                int month = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++);
-//                int day = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++);
-//                int hours = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++);
-//                int minutes = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++);
-//                int seconds = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++);
-//
-//                glucoseMeasurementRecord.setCalendar(new GregorianCalendar(year, month - 1, day, hours, minutes, seconds));
-//
-//                // ⏳ Time Offset
-//                int timeOffset = ((flag & (1 << 0)) > 0) ? characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset) : 0;
-//                if ((flag & (1 << 0)) > 0) offset += 2;
-//                glucoseMeasurementRecord.setTimeOffset(timeOffset);
-//
-//                // 🧪 Đơn vị đo glucose (mg/dL hoặc mmol/L)
-//                float glucoseValue = characteristic.getFloatValue(BluetoothGattCharacteristic.FORMAT_SFLOAT, offset);
-//                offset += 2;
-//
-//                if ((flag & (1 << 1)) > 0) {
-//                    glucoseMeasurementRecord.setGlucoseConcentrationMeasurementUnit(
-//                            GlucoseMeasurementRecord.GlucoseConcentrationMeasurementUnit.MOLES_PER_LITRE);
-//                } else {
-//                    glucoseMeasurementRecord.setGlucoseConcentrationMeasurementUnit(
-//                            GlucoseMeasurementRecord.GlucoseConcentrationMeasurementUnit.KILOGRAM_PER_LITRE);
-//                }
-//                glucoseMeasurementRecord.setGlucoseConcentrationValue(glucoseValue);
-//
-//                // 🩸 Loại mẫu máu & vị trí lấy mẫu
-//                int typeAndSampleLocation = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset);
-//                int sampleType = typeAndSampleLocation >> 4;
-//                int sampleLocation = typeAndSampleLocation & 0x0F;
-//                glucoseMeasurementRecord.setType(sampleType);
-//                glucoseMeasurementRecord.setSampleLocationInteger(sampleLocation);
-//                offset += 1;
-//
-//                // 🔔 Trạng thái cảm biến
-//                if ((flag & (1 << 2)) > 0) {
-//                    int sensorStatusValue = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset);
-//                    offset += 2;
-//
-//                    SensorStatusAnnunciation sensorStatusAnnunciation = new SensorStatusAnnunciation();
-//                    sensorStatusAnnunciation.setDeviceBatteryLowAtTimeOfMeasurement((sensorStatusValue & (1 << 0)) > 0);
-//                    sensorStatusAnnunciation.setSensorMalfunctionAtTimeOfMeasurement((sensorStatusValue & (1 << 1)) > 0);
-//                    sensorStatusAnnunciation.setBloodSampleInsufficientAtTimeOfMeasurement((sensorStatusValue & (1 << 2)) > 0);
-//                    sensorStatusAnnunciation.setStripInsertionError((sensorStatusValue & (1 << 3)) > 0);
-//                    sensorStatusAnnunciation.setStripTypeIncorrectForDevice((sensorStatusValue & (1 << 4)) > 0);
-//                    sensorStatusAnnunciation.setSensorResultHigherThanDeviceCanProcess((sensorStatusValue & (1 << 5)) > 0);
-//                    sensorStatusAnnunciation.setSensorResultLowerThanTheDeviceCanProcess((sensorStatusValue & (1 << 6)) > 0);
-//                    sensorStatusAnnunciation.setSensorTemperatureTooHighForValidTestResult((sensorStatusValue & (1 << 7)) > 0);
-//                    sensorStatusAnnunciation.setSensorTemperatureTooLowForValidTestResult((sensorStatusValue & (1 << 8)) > 0);
-//                    sensorStatusAnnunciation.setSensorReadInterruptedBecauseStripWasPulledTooSoon((sensorStatusValue & (1 << 9)) > 0);
-//                    sensorStatusAnnunciation.setGeneralDeviceFaultHasOccurredInSensor((sensorStatusValue & (1 << 10)) > 0);
-//                    sensorStatusAnnunciation.setTimeFaultHasOccurredInTheSensor((sensorStatusValue & (1 << 11)) > 0);
-//
-//                    glucoseMeasurementRecord.setSensorStatusAnnunciation(sensorStatusAnnunciation);
-//                }
-                //KHƯƠNG
-                onCharacteristicReceived(gatt, characteristic, value, BluetoothGatt.GATT_SUCCESS);
+
+                GlucoseMeasurementRecord glucoseMeasurementRecord = new GlucoseMeasurementRecord();
+                int offset = 0;
+
+                // 🏷️ Đọc Flags
+                int flag = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset);
+                offset += 1;
+
+                // 🔢 Số thứ tự lần đo
+                glucoseMeasurementRecord.sequenceNumber = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset);
+                offset += 2;
+
+                // 🕒 Thời gian đo
+                int baseTimeYear = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset);
+                offset += 2;
+                int baseTimeMonth = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++); // Tháng
+                int baseTimeDay = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++); // Ngày
+                int baseTimeHours = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++); // Giờ
+                int baseTimeMinutes = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++); // Phút
+                int baseTimeSeconds = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++);// Giây
+
+
+                glucoseMeasurementRecord.calendar = new GregorianCalendar(baseTimeYear, baseTimeMonth, baseTimeDay, baseTimeHours, baseTimeMinutes, baseTimeSeconds);
+                // ⏳ Time Offset
+                int timeOffset = ((flag & (1 << 0)) > 0) ? characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset) : 0;
+                if ((flag & (1 << 0)) > 0) offset += 2;
+                glucoseMeasurementRecord.timeOffset = timeOffset;
+                // Xử lý đơn vị đo glucose cho máy đường huyết
+
+                if ((flag & (1 << 1)) > 0) {
+                    if ((flag & (1 << 2)) > 0) {
+                        // 🧪 Đơn vị đo glucose (mg/dL hoặc mmol/L)
+                        glucoseMeasurementRecord.glucoseConcentrationMeasurementUnit = GlucoseMeasurementRecord.GlucoseConcentrationMeasurementUnit.MOLES_PER_LITRE;
+                        characteristic.getFloatValue(BluetoothGattCharacteristic.FORMAT_SFLOAT, offset);
+                    } else {
+                        // glucose concentration unit of measurement is kg/L(Đơn vị kg/L)
+                        glucoseMeasurementRecord.glucoseConcentrationMeasurementUnit = GlucoseMeasurementRecord.GlucoseConcentrationMeasurementUnit.KILOGRAM_PER_LITRE;
+                        characteristic.getFloatValue(BluetoothGattCharacteristic.FORMAT_SFLOAT, offset);
+
+                    }
+                    offset += 2;
+                    int typeAndSampleLocation = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset);
+                    glucoseMeasurementRecord.type = typeAndSampleLocation >> 4;
+                    glucoseMeasurementRecord.sampleLocationInteger = typeAndSampleLocation & 0x0F;
+                    offset += 1;
+                }
+
+                // 🔔 Trạng thái cảm biến
+                if ((flag & (1 << 2)) > 0) {
+                    int sensorStatusAnnunciationValue = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset);
+                    offset += 2;
+                    SensorStatusAnnunciation sensorStatusAnnunciation = new SensorStatusAnnunciation();
+                    sensorStatusAnnunciation.deviceBatteryLowAtTimeOfMeasurement = (sensorStatusAnnunciationValue & (1 << 0)) > 0;
+                    sensorStatusAnnunciation.sensorMalfunctionAtTimeOfMeasurement = (sensorStatusAnnunciationValue & (1 << 1)) > 0;
+                    sensorStatusAnnunciation.bloodSampleInsufficientAtTimeOfMeasurement = (sensorStatusAnnunciationValue & (1 << 2)) > 0;
+                    sensorStatusAnnunciation.stripInsertionError = (sensorStatusAnnunciationValue & (1 << 3)) > 0;
+                    sensorStatusAnnunciation.stripTypeIncorrectForDevice = (sensorStatusAnnunciationValue & (1 << 4)) > 0;
+                    sensorStatusAnnunciation.sensorResultHigherThanDeviceCanProcess = (sensorStatusAnnunciationValue & (1 << 5)) > 0;
+                    sensorStatusAnnunciation.sensorResultLowerThanTheDeviceCanProcess = (sensorStatusAnnunciationValue & (1 << 6)) > 0;
+                    sensorStatusAnnunciation.sensorTemperatureTooHighForValidTestResult = (sensorStatusAnnunciationValue & (1 << 7)) > 0;
+                    sensorStatusAnnunciation.sensorTemperatureTooLowForValidTestResult = (sensorStatusAnnunciationValue & (1 << 8)) > 0;
+                    sensorStatusAnnunciation.sensorReadInterruptedBecauseStripWasPulledTooSoon = (sensorStatusAnnunciationValue & (1 << 9)) > 0;
+                    sensorStatusAnnunciation.generalDeviceFaultHasOccurredInSensor = (sensorStatusAnnunciationValue & (1 << 10)) > 0;
+                    sensorStatusAnnunciation.timeFaultHasOccurredInTheSensor = (sensorStatusAnnunciationValue & (1 << 11)) > 0;
+                    glucoseMeasurementRecord.sensorStatusAnnunciation = sensorStatusAnnunciation;
+
+                }
+                bluetoothGattStateIntent.setAction(BluetoothGattStateInformationReceiver.BLUETOOTH_LE_GATT_ACTION_GLUCOSE_MEASUREMENT_RECORD_AVAILABLE);
+
+                bluetoothGattStateIntent.putExtra(BluetoothGattStateInformationReceiver.BLUETOOTH_LE_GATT_GLUCOSE_MEASUREMENT_RECORD_EXTRA, glucoseMeasurementRecord);
+
+                localBroadcastManager.sendBroadcast(bluetoothGattStateIntent);
+            } else if (GlucoseProfileConfiguration.GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
+                // Todo, get characteristic value of the glucose measurement context characteristic
+                // Lấy các giá tị đặc tính
+
+            } else if (GlucoseProfileConfiguration.RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
+                log(LogLevel.DEBUG, "📡 Nhận dữ liệu đo đường huyết...");
+
+                bluetoothGattStateIntent.setAction(BluetoothGattStateInformationReceiver.RECORDS_SENT_COMPLETE);
+                localBroadcastManager.sendBroadcast(bluetoothGattStateIntent);
             }
+            //KHƯƠNG
         }
 
         @Override

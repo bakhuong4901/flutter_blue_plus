@@ -9,16 +9,16 @@ import java.util.GregorianCalendar;
 import java.util.Locale;
 
 public class GlucoseMeasurementRecord implements Parcelable {
-    private int sequenceNumber;
-    private GregorianCalendar calendar;
-    private int timeOffset;
-    private GlucoseConcentrationMeasurementUnit glucoseConcentrationMeasurementUnit;
-    private float glucoseConcentrationValue;
-    private int type;
-    private int sampleLocationInteger;
-    private String testBloodType;
-    private String sampleLocation;
-    private SensorStatusAnnunciation sensorStatusAnnunciation;
+    public int sequenceNumber;
+    public GregorianCalendar calendar;
+    public int timeOffset;
+    public GlucoseConcentrationMeasurementUnit glucoseConcentrationMeasurementUnit;
+    public float glucoseConcentrationValue;
+    public int type;
+    public int sampleLocationInteger;
+    public String testBloodType;
+    public String sampleLocation;
+    public SensorStatusAnnunciation sensorStatusAnnunciation;
 
     public GlucoseMeasurementRecord() {
         this.sequenceNumber = 0;  // Số thứ tự của lần đo.
@@ -33,6 +33,7 @@ public class GlucoseMeasurementRecord implements Parcelable {
         this.sensorStatusAnnunciation = null; // Trạng thái của cảm biến đo (có thể null nếu không có dữ liệu).
         initializeBloodTypeAndLocation();
     }
+
 
     private void initializeBloodTypeAndLocation() {
         switch (type) {
@@ -150,14 +151,14 @@ public class GlucoseMeasurementRecord implements Parcelable {
     @Override
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeInt(sequenceNumber);
-        parcel.writeSerializable(calendar);
+        dest.writeLong(calendar.getTimeInMillis());
         dest.writeInt(timeOffset);
         dest.writeFloat(glucoseConcentrationValue);
         dest.writeInt(type);
         dest.writeInt(sampleLocationInteger);
         dest.writeString(testBloodType);
         dest.writeString(sampleLocation);
-        parcel.writeSerializable(sensorStatusAnnunciation);
+        dest.writeParcelable(sensorStatusAnnunciation,flags);
         dest.writeSerializable(glucoseConcentrationMeasurementUnit);
         //FIX
 //        dest.writeString(glucoseConcentrationMeasurementUnit.name());
