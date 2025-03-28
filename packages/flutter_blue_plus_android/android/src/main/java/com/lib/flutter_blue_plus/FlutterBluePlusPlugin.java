@@ -2058,6 +2058,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                     super.onBatchScanResults(results);
                 }
 
+                // ⚰️ SCAN FAILED
                 @Override
                 public void onScanFailed(int errorCode) {
                     log(LogLevel.ERROR, "onScanFailed: " + scanFailedString(errorCode));
@@ -2325,6 +2326,10 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
             invokeMethodUIThread("OnCharacteristicReceived", response);
         }
 
+
+        //K Danh sách lưu trữ các bản ghi GlucoseMeasurementRecord
+        private List<GlucoseMeasurementRecord> glucoseMeasurementRecords = new ArrayList<>();
+
         @Override
         @TargetApi(33) // newer function with byte[] value argument
         // 🐷 XỬ LÝ DỮ LIỆU ĐƯỜNG HUYẾT CỦA MÁY 🐷
@@ -2346,15 +2351,15 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
                 // 🏷️ Đọc Flags
                 int flag = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset);
-                offset += 1;
+                offset += 1; // offset is 1
 
                 // 🔢 Số thứ tự lần đo
                 glucoseMeasurementRecord.sequenceNumber = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset);
-                offset += 2;
+                offset += 2; // offset is 3
 
                 // 🕒 Thời gian đo
                 int baseTimeYear = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset);
-                offset += 2;
+                offset += 2; // offset is 5
                 int baseTimeMonth = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++); // Tháng
                 int baseTimeDay = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++); // Ngày
                 int baseTimeHours = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset++); // Giờ
@@ -2365,7 +2370,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 glucoseMeasurementRecord.calendar = new GregorianCalendar(baseTimeYear, baseTimeMonth, baseTimeDay, baseTimeHours, baseTimeMinutes, baseTimeSeconds);
                 // ⏳ Time Offset
                 int timeOffset = ((flag & (1 << 0)) > 0) ? characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset) : 0;
-                if ((flag & (1 << 0)) > 0) offset += 2;
+                if ((flag & (1 << 0)) > 0) offset += 2; // offset is 12
                 glucoseMeasurementRecord.timeOffset = timeOffset;
                 // Xử lý đơn vị đo glucose cho máy đường huyết
 
@@ -2373,24 +2378,24 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                     if ((flag & (1 << 2)) > 0) {
                         // 🧪 Đơn vị đo glucose (mg/dL hoặc mmol/L)
                         glucoseMeasurementRecord.glucoseConcentrationMeasurementUnit = GlucoseMeasurementRecord.GlucoseConcentrationMeasurementUnit.MOLES_PER_LITRE;
-                        characteristic.getFloatValue(BluetoothGattCharacteristic.FORMAT_SFLOAT, offset);
+                        glucoseMeasurementRecord.glucoseConcentrationValue = characteristic.getFloatValue(BluetoothGattCharacteristic.FORMAT_SFLOAT, offset);
                     } else {
                         // glucose concentration unit of measurement is kg/L(Đơn vị kg/L)
                         glucoseMeasurementRecord.glucoseConcentrationMeasurementUnit = GlucoseMeasurementRecord.GlucoseConcentrationMeasurementUnit.KILOGRAM_PER_LITRE;
-                        characteristic.getFloatValue(BluetoothGattCharacteristic.FORMAT_SFLOAT, offset);
+                        glucoseMeasurementRecord.glucoseConcentrationValue = characteristic.getFloatValue(BluetoothGattCharacteristic.FORMAT_SFLOAT, offset);
 
                     }
-                    offset += 2;
+                    offset += 2; // offset is 14
                     int typeAndSampleLocation = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, offset);
                     glucoseMeasurementRecord.type = typeAndSampleLocation >> 4;
                     glucoseMeasurementRecord.sampleLocationInteger = typeAndSampleLocation & 0x0F;
-                    offset += 1;
+                    offset += 1; // offset is 15
                 }
 
                 // 🔔 Trạng thái cảm biến
                 if ((flag & (1 << 2)) > 0) {
                     int sensorStatusAnnunciationValue = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, offset);
-                    offset += 2;
+                    offset += 2; // offset is 16 or 12 or 9
                     SensorStatusAnnunciation sensorStatusAnnunciation = new SensorStatusAnnunciation();
                     sensorStatusAnnunciation.deviceBatteryLowAtTimeOfMeasurement = (sensorStatusAnnunciationValue & (1 << 0)) > 0;
                     sensorStatusAnnunciation.sensorMalfunctionAtTimeOfMeasurement = (sensorStatusAnnunciationValue & (1 << 1)) > 0;
@@ -2407,6 +2412,10 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                     glucoseMeasurementRecord.sensorStatusAnnunciation = sensorStatusAnnunciation;
 
                 }
+                //K Thêm bản ghi vào danh sách glucoseMeasurementRecords
+                glucoseMeasurementRecords.add(glucoseMeasurementRecord);
+                //K
+
                 bluetoothGattStateIntent.setAction(BluetoothGattStateInformationReceiver.BLUETOOTH_LE_GATT_ACTION_GLUCOSE_MEASUREMENT_RECORD_AVAILABLE);
 
                 bluetoothGattStateIntent.putExtra(BluetoothGattStateInformationReceiver.BLUETOOTH_LE_GATT_GLUCOSE_MEASUREMENT_RECORD_EXTRA, glucoseMeasurementRecord);
@@ -2414,7 +2423,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 localBroadcastManager.sendBroadcast(bluetoothGattStateIntent);
             } else if (GlucoseProfileConfiguration.GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
                 // Todo, get characteristic value of the glucose measurement context characteristic
-                // Lấy các giá tị đặc tính
+                // Lấy các giá trị đặc tính
 
             } else if (GlucoseProfileConfiguration.RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
                 log(LogLevel.DEBUG, "📡 Nhận dữ liệu đo đường huyết...");
@@ -2422,7 +2431,45 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 bluetoothGattStateIntent.setAction(BluetoothGattStateInformationReceiver.RECORDS_SENT_COMPLETE);
                 localBroadcastManager.sendBroadcast(bluetoothGattStateIntent);
             }
+
+            // Gọi hàm để in ra danh sách các bản ghi đã xử lý
+            printGlucoseMeasurementRecords();
             //KHƯƠNG
+        }
+
+        // Phương thức in danh sách các bản ghi GlucoseMeasurementRecord
+        public void printGlucoseMeasurementRecords() {
+            if (glucoseMeasurementRecords.isEmpty()) {
+                System.out.println("Danh sách không có bản ghi đo đường huyết nào.");
+                return;
+            }
+
+            System.out.println("Danh sách các bản ghi đo đường huyết:");
+            for (GlucoseMeasurementRecord record : glucoseMeasurementRecords) {
+                System.out.println("-----------------------------------------------------");
+                System.out.println("Số thứ tự lần đo: " + record.sequenceNumber);
+                System.out.println("Thời gian đo: " + record.calendar.getTime().toString());
+                System.out.println("Độ lệch thời gian (timeOffset): " + record.timeOffset);
+
+                // In nồng độ glucose và đơn vị đo
+                System.out.println("Nồng độ glucose: " + (record.glucoseConcentrationMeasurementUnit == GlucoseMeasurementRecord.GlucoseConcentrationMeasurementUnit.MOLES_PER_LITRE ? record.convertGlucoseConcentrationValueToMilligramsPerDeciliter() : record.convertGlucoseConcentrationValueToMilligramsPerDeciliter()));
+
+                // In loại mẫu và vị trí lấy mẫu
+                System.out.println("Loại mẫu: " + record.type);
+                System.out.println("Vị trí lấy mẫu: " + record.sampleLocationInteger);
+
+                // In trạng thái cảm biến nếu có
+                if (record.sensorStatusAnnunciation != null) {
+                    SensorStatusAnnunciation sensorStatus = record.sensorStatusAnnunciation;
+                    System.out.println("Trạng thái cảm biến:");
+                    System.out.println("Pin yếu: " + sensorStatus.deviceBatteryLowAtTimeOfMeasurement);
+                    System.out.println("Lỗi cảm biến: " + sensorStatus.sensorMalfunctionAtTimeOfMeasurement);
+                    System.out.println("Mẫu máu không đủ: " + sensorStatus.bloodSampleInsufficientAtTimeOfMeasurement);
+                    System.out.println("Lỗi chèn que thử: " + sensorStatus.stripInsertionError);
+                    System.out.println("Nhiệt độ quá cao: " + sensorStatus.sensorTemperatureTooHighForValidTestResult);
+                    System.out.println("Nhiệt độ quá thấp: " + sensorStatus.sensorTemperatureTooLowForValidTestResult);
+                }
+            }
         }
 
         @Override
@@ -2754,35 +2801,35 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
         // perf: only add keys if they exists
         HashMap<String, Object> map = new HashMap<>();
         if (device.getAddress() != null) {
-            map.put("remote_id", device.getAddress());
+            map.put("remote_id", device.getAddress()); // Địa chỉ MAC
         }
         ;
         if (device.getName() != null) {
-            map.put("platform_name", device.getName());
+            map.put("platform_name", device.getName()); // Tên thiết bị
         }
         if (connectable) {
-            map.put("connectable", 1);
+            map.put("connectable", 1); // Khả năng kết nối
         }
         if (advName != null) {
-            map.put("adv_name", advName);
+            map.put("adv_name", advName); // Tên quảng cáo
         }
         if (txPower != min) {
-            map.put("tx_power_level", txPower);
+            map.put("tx_power_level", txPower); // Mức công suất phát
         }
         if (appearance != 0) {
-            map.put("appearance", appearance);
+            map.put("appearance", appearance); // Bề ngoài
         }
         if (manufData != null) {
-            map.put("manufacturer_data", manufDataB);
+            map.put("manufacturer_data", manufDataB); // Dữ liệu nhà sản xuất
         }
         if (serviceData != null) {
-            map.put("service_data", serviceDataB);
+            map.put("service_data", serviceDataB); // Dữ liệu dịch vụ
         }
         if (serviceUuids != null) {
-            map.put("service_uuids", serviceUuidsB);
+            map.put("service_uuids", serviceUuidsB); // Dịch vụ UUID
         }
         if (result.getRssi() != 0) {
-            map.put("rssi", result.getRssi());
+            map.put("rssi", result.getRssi()); // Cường độ tín hiệu
         }
         ;
         return map;
@@ -2974,7 +3021,10 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
         }
     }
 
+
+    // dùng để gọi 1 phương thức Flutter từ luồng giao diện người dùng (UI)
     private void invokeMethodUIThread(final String method, HashMap<String, Object> data) {
+        // đảm bảo rằng phương thức này chạy trên UI thread.
         new Handler(Looper.getMainLooper()).post(() -> {
             //Could already be teared down at this moment
             if (methodChannel != null) {

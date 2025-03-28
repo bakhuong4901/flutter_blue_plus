@@ -119,6 +119,7 @@ class BmStopScanRequest {
   BmStopScanRequest();
 }
 
+// Model Hiển thị Máy và thông tin máy sau khi quét thành công
 class BmScanAdvertisement {
   final DeviceIdentifier remoteId;
   final String? platformName;
