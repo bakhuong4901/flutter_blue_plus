@@ -44,7 +44,9 @@ class BmMsdFilter {
   int manufacturerId;
   List<int>? data;
   List<int>? mask;
+
   BmMsdFilter(this.manufacturerId, this.data, this.mask);
+
   Map<dynamic, dynamic> toMap() {
     final Map<dynamic, dynamic> map = {};
     map['manufacturer_id'] = manufacturerId;
@@ -58,7 +60,9 @@ class BmServiceDataFilter {
   Guid service;
   List<int> data;
   List<int> mask;
+
   BmServiceDataFilter(this.service, this.data, this.mask);
+
   Map<dynamic, dynamic> toMap() {
     final Map<dynamic, dynamic> map = {};
     map['service'] = service.str;
@@ -110,7 +114,9 @@ class BmScanSettings {
     data['android_legacy'] = androidLegacy;
     data['android_scan_mode'] = androidScanMode;
     data['android_uses_fine_location'] = androidUsesFineLocation;
-    data['web_optional_services'] = webOptionalServices.map((s) => s.str).toList();;
+    data['web_optional_services'] =
+        webOptionalServices.map((s) => s.str).toList();
+    ;
     return data;
   }
 }
@@ -118,6 +124,45 @@ class BmScanSettings {
 class BmStopScanRequest {
   BmStopScanRequest();
 }
+
+class GlucoseMeasurementRecord {
+  int? sequenceNumber;
+  int? year;
+  int? month;
+  int? day;
+  int? hours;
+  int? minutes;
+  double? seconds;
+  int? timeOffset;
+  String? glucoseConcentrationMeasurementUnit;
+  double? glucoseConcentrationValue;
+  int? type;
+  int? sampleLocationInteger;
+  String? testBloodType;
+  String? sampleLocation;
+  SensorStatusAnnunciation? sensorStatusAnnunciation;
+
+  GlucoseMeasurementRecord({
+    this.sequenceNumber,
+    this.year,
+    this.month,
+    this.day,
+    this.hours,
+    this.minutes,
+    this.seconds,
+    this.timeOffset,
+    this.glucoseConcentrationMeasurementUnit,
+    this.glucoseConcentrationValue,
+    this.type,
+    this.sampleLocationInteger,
+    this.testBloodType,
+    this.sampleLocation,
+    this.sensorStatusAnnunciation,
+  });
+}
+
+// Thông báo trạng thái cảm  biến
+class SensorStatusAnnunciation {}
 
 // Model Hiển thị Máy và thông tin máy sau khi quét thành công
 class BmScanAdvertisement {
@@ -169,7 +214,8 @@ class BmScanAdvertisement {
       remoteId: DeviceIdentifier(json['remote_id']),
       platformName: json['platform_name'],
       advName: json['adv_name'],
-      connectable: json['connectable'] != null ? json['connectable'] != 0 : false,
+      connectable:
+          json['connectable'] != null ? json['connectable'] != 0 : false,
       txPowerLevel: json['tx_power_level'],
       appearance: json['appearance'],
       manufacturerData: manufacturerData,
@@ -305,7 +351,6 @@ class BmBluetoothCharacteristic {
   final Guid? primaryServiceUuid;
   List<BmBluetoothDescriptor> descriptors;
   BmCharacteristicProperties properties;
-
 
   BmBluetoothCharacteristic({
     required this.remoteId,
@@ -471,7 +516,6 @@ class BmCharacteristicData {
   final int errorCode;
   final String errorString;
 
-
   BmCharacteristicData({
     required this.remoteId,
     required this.serviceUuid,
@@ -537,7 +581,6 @@ class BmWriteCharacteristicRequest {
   final BmWriteType writeType;
   final bool allowLongWrite;
   final List<int> value;
-
 
   BmWriteCharacteristicRequest({
     required this.remoteId,
@@ -639,7 +682,6 @@ class BmSetNotifyValueRequest {
   final bool forceIndications;
   final bool enable;
 
-
   BmSetNotifyValueRequest({
     required this.remoteId,
     required this.serviceUuid,
@@ -683,7 +725,8 @@ class BmConnectionStateResponse {
   factory BmConnectionStateResponse.fromMap(Map<dynamic, dynamic> json) {
     return BmConnectionStateResponse(
       remoteId: DeviceIdentifier(json['remote_id']),
-      connectionState: BmConnectionStateEnum.values[json['connection_state'] as int],
+      connectionState:
+          BmConnectionStateEnum.values[json['connection_state'] as int],
       disconnectReasonCode: json['disconnect_reason_code'],
       disconnectReasonString: json['disconnect_reason_string'],
     );
@@ -872,7 +915,9 @@ class BmBondStateResponse {
     return BmBondStateResponse(
       remoteId: DeviceIdentifier(json['remote_id']),
       bondState: BmBondStateEnum.values[json['bond_state']],
-      prevState: json['prev_state'] != null ? BmBondStateEnum.values[json['prev_state']] : null,
+      prevState: json['prev_state'] != null
+          ? BmBondStateEnum.values[json['prev_state']]
+          : null,
     );
   }
 }
@@ -885,7 +930,7 @@ class BmCreateBondRequest {
     required this.remoteId,
     required this.pin,
   });
-  
+
   Map<dynamic, dynamic> toMap() {
     final Map<dynamic, dynamic> data = {};
     data['remote_id'] = remoteId.str;
@@ -982,7 +1027,9 @@ class PhySupport {
 int bmUserCanceledErrorCode = 23789258;
 
 String _hexEncode(List<int> numbers) {
-  return numbers.map((n) => (n & 0xFF).toRadixString(16).padLeft(2, '0')).join();
+  return numbers
+      .map((n) => (n & 0xFF).toRadixString(16).padLeft(2, '0'))
+      .join();
 }
 
 List<int> _hexDecode(String hex) {

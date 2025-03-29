@@ -59,6 +59,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.GregorianCalendar;
+import java.util.Calendar;
 
 import java.lang.reflect.Method;
 
@@ -2434,10 +2435,55 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
             // Gọi hàm để in ra danh sách các bản ghi đã xử lý
             printGlucoseMeasurementRecords();
+
+//            sendGlucoseRecordToFlutter(glucoseMeasurementRecords);
             //KHƯƠNG
         }
 
-        // Phương thức in danh sách các bản ghi GlucoseMeasurementRecord
+        // GỬI DATA LÊN FLUTTER QUA METHOD CHANNEL
+        public void sendGlucoseRecordToFlutter(List<GlucoseMeasurementRecord> records) {
+            // Danh sách chứa toàn bộ kết quả đo đường huyết
+            List<HashMap<String, Object>> glucoseMeasurementList = new ArrayList<>();
+            for (GlucoseMeasurementRecord record : records) {
+                HashMap<String, Object> glucoseData = new HashMap<>();
+                glucoseData.put("sequenceNumber", record.sequenceNumber);
+                glucoseData.put("baseTimeYear", record.calendar.get(Calendar.YEAR));
+                glucoseData.put("baseTimeMonth", record.calendar.get(Calendar.MONTH)); // Tháng bắt đầu từ 0
+                glucoseData.put("baseTimeDay", record.calendar.get(Calendar.DAY_OF_MONTH));
+                glucoseData.put("baseTimeHours", record.calendar.get(Calendar.HOUR));
+                glucoseData.put("baseTimeMinutes", record.calendar.get(Calendar.MINUTE));
+                glucoseData.put("baseTimeSeconds", record.calendar.get(Calendar.SECOND));
+                glucoseData.put("timeOffset", record.timeOffset);
+                glucoseData.put("measurementUnit", record.glucoseConcentrationMeasurementUnit.name());
+                // Nếu có thông tin về loại mẫu máu và vị trí lấy mẫu
+                glucoseData.put("type", record.type);
+                glucoseData.put("sampleLocation", record.sampleLocationInteger);
+                // Thêm trạng thái cảm biến nếu có
+                if (record.sensorStatusAnnunciation != null) {
+                    HashMap<String, Boolean> sensorStatus = new HashMap<>();
+                    sensorStatus.put("batteryLow", record.sensorStatusAnnunciation.deviceBatteryLowAtTimeOfMeasurement);
+                    sensorStatus.put("sensorMalfunction", record.sensorStatusAnnunciation.sensorMalfunctionAtTimeOfMeasurement);
+                    sensorStatus.put("insufficientBloodSample", record.sensorStatusAnnunciation.bloodSampleInsufficientAtTimeOfMeasurement);
+                    sensorStatus.put("stripInsertionError", record.sensorStatusAnnunciation.stripInsertionError);
+                    sensorStatus.put("stripTypeIncorrect", record.sensorStatusAnnunciation.stripTypeIncorrectForDevice);
+                    sensorStatus.put("resultHigherThanProcessable", record.sensorStatusAnnunciation.sensorResultHigherThanDeviceCanProcess);
+                    sensorStatus.put("resultLowerThanProcessable", record.sensorStatusAnnunciation.sensorResultLowerThanTheDeviceCanProcess);
+                    //
+                    glucoseData.put("sensorStatus", sensorStatus);
+                }
+                // Thêm vào danh sách kết quả
+                glucoseMeasurementList.add(glucoseData);
+            }
+            HashMap<String, Object> glucoseDataRecords = new HashMap<>();
+            glucoseDataRecords.put("response", glucoseMeasurementList);
+
+            // Gửi danh sách dữ liệu sang Flutter
+            invokeMethodUIThread("OnGlucoseRecordsReceived", glucoseDataRecords);
+
+
+        }
+
+        // Phương thức in danh sách các bản ghi GlucoseMeasurementRecord ( Cái này dùng để hiển thị xem LOG thôi )
         public void printGlucoseMeasurementRecords() {
             if (glucoseMeasurementRecords.isEmpty()) {
                 System.out.println("Danh sách không có bản ghi đo đường huyết nào.");
@@ -2735,18 +2781,18 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
     }; // BluetoothGattCallback
 
-    //////////////////////////////////////////////////////////////////////
-    // ███    ███  ███████   ██████
-    // ████  ████  ██       ██
-    // ██ ████ ██  ███████  ██   ███
-    // ██  ██  ██       ██  ██    ██
-    // ██      ██  ███████   ██████
-    //
-    // ██   ██  ███████  ██       ██████   ███████  ██████   ███████
-    // ██   ██  ██       ██       ██   ██  ██       ██   ██  ██
-    // ███████  █████    ██       ██████   █████    ██████   ███████
-    // ██   ██  ██       ██       ██       ██       ██   ██       ██
-    // ██   ██  ███████  ███████  ██       ███████  ██   ██  ███████
+//////////////////////////////////////////////////////////////////////
+// ███    ███  ███████   ██████
+// ████  ████  ██       ██
+// ██ ████ ██  ███████  ██   ███
+// ██  ██  ██       ██  ██    ██
+// ██      ██  ███████   ██████
+//
+// ██   ██  ███████  ██       ██████   ███████  ██████   ███████
+// ██   ██  ██       ██       ██   ██  ██       ██   ██  ██
+// ███████  █████    ██       ██████   █████    ██████   ███████
+// ██   ██  ██       ██       ██       ██       ██   ██       ██
+// ██   ██  ███████  ███████  ██       ███████  ██   ██  ███████
 
     HashMap<String, Object> bmScanAdvertisement(BluetoothDevice device, ScanResult result) {
 
@@ -2994,12 +3040,12 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
         return null;
     }
 
-    //////////////////////////////////////////
-    // ██    ██ ████████  ██  ██       ███████
-    // ██    ██    ██     ██  ██       ██
-    // ██    ██    ██     ██  ██       ███████
-    // ██    ██    ██     ██  ██            ██
-    //  ██████     ██     ██  ███████  ███████
+//////////////////////////////////////////
+// ██    ██ ████████  ██  ██       ███████
+// ██    ██    ██     ██  ██       ██
+// ██    ██    ██     ██  ██       ███████
+// ██    ██    ██     ██  ██            ██
+//  ██████     ██     ██  ███████  ███████
 
     private void log(LogLevel level, String message) {
         if (level.ordinal() > logLevel.ordinal()) {
@@ -3228,7 +3274,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
 
     // Defined in the Bluetooth Standard, Volume 1, Part F, 1.3 HCI Error Code, pages 364-377.
-    // See https://www.bluetooth.org/docman/handlers/downloaddoc.ashx?doc_id=478726,
+// See https://www.bluetooth.org/docman/handlers/downloaddoc.ashx?doc_id=478726,
     private static String hciStatusString(int value) {
         switch (value) {
             case 0x00:
