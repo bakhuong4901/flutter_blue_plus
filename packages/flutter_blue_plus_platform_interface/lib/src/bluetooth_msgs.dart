@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:flutter_blue_plus_platform_interface/flutter_blue_plus_platform_interface.dart';
+
 import 'device_identifier.dart';
 import 'guid.dart';
 import 'log_level.dart';
@@ -125,6 +127,12 @@ class BmStopScanRequest {
   BmStopScanRequest();
 }
 
+// Thông báo trạng thái cảm  biến
+class SensorStatusAnnunciation {
+  SensorStatusAnnunciation();
+}
+
+//Model data sau khi nhận từ Native gửi qua method channel
 class GlucoseMeasurementRecord {
   int? sequenceNumber;
   int? year;
@@ -138,9 +146,33 @@ class GlucoseMeasurementRecord {
   double? glucoseConcentrationValue;
   int? type;
   int? sampleLocationInteger;
-  String? testBloodType;
   String? sampleLocation;
   SensorStatusAnnunciation? sensorStatusAnnunciation;
+
+  factory GlucoseMeasurementRecord.fromMap(Map<String, dynamic> json) {
+    return GlucoseMeasurementRecord(
+      sequenceNumber:
+          json['sequenceNumber'] != null ? json['sequenceNumber'] : null,
+      year: json['baseTimeYear'] != null ? json['baseTimeYear'] : null,
+      month: json['baseTimeMonth'] != null ? json['baseTimeMonth'] : null,
+      day: json['baseTimeDay'] != null ? json['baseTimeDay'] : null,
+      hours: json['baseTimeHours'] != null ? json['baseTimeHours'] : null,
+      minutes: json['baseTimeMinutes'] != null ? json['baseTimeMinutes'] : null,
+      seconds: json['baseTimeSeconds'] != null ? json['baseTimeSeconds'] : null,
+      timeOffset: json['timeOffset'] != null ? json['timeOffset'] : null,
+      glucoseConcentrationMeasurementUnit:
+          json['measurementUnit'] != null ? json['measurementUnit'] : null,
+      glucoseConcentrationValue: json['glucoseConcentrationValue'] != null
+          ? json['glucoseConcentrationValue']
+          : null,
+      type: json['type'] != null ? json['type'] : null,
+      sampleLocationInteger: json['sampleLocationInteger'] != null
+          ? json['sampleLocationInteger']
+          : null,
+      sampleLocation:
+          json['sampleLocation'] != null ? json['sampleLocation'] : null,
+    );
+  }
 
   GlucoseMeasurementRecord({
     this.sequenceNumber,
@@ -155,14 +187,27 @@ class GlucoseMeasurementRecord {
     this.glucoseConcentrationValue,
     this.type,
     this.sampleLocationInteger,
-    this.testBloodType,
     this.sampleLocation,
     this.sensorStatusAnnunciation,
   });
 }
 
-// Thông báo trạng thái cảm  biến
-class SensorStatusAnnunciation {}
+class BmGlucoseRecordResponse {
+  final List<GlucoseMeasurementRecord> listGlucoseMeasurementRecord;
+
+  factory BmGlucoseRecordResponse.fromMap(Map<dynamic, dynamic> json) {
+    List<GlucoseMeasurementRecord> listGlucoseMeasurementRecord = [];
+    for (var item in json['glucoseDataRecords']) {
+      listGlucoseMeasurementRecord.add(GlucoseMeasurementRecord.fromMap(item));
+    }
+    return BmGlucoseRecordResponse(
+        listGlucoseMeasurementRecord: listGlucoseMeasurementRecord);
+  }
+
+  BmGlucoseRecordResponse({
+    required this.listGlucoseMeasurementRecord,
+  });
+}
 
 // Model Hiển thị Máy và thông tin máy sau khi quét thành công
 class BmScanAdvertisement {

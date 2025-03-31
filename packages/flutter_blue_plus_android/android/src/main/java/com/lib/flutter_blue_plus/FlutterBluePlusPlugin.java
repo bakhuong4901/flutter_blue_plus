@@ -2455,9 +2455,11 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 glucoseData.put("baseTimeSeconds", record.calendar.get(Calendar.SECOND));
                 glucoseData.put("timeOffset", record.timeOffset);
                 glucoseData.put("measurementUnit", record.glucoseConcentrationMeasurementUnit.name());
+                glucoseData.put("glucoseConcentrationValue", record.glucoseConcentrationValue);
                 // Nếu có thông tin về loại mẫu máu và vị trí lấy mẫu
                 glucoseData.put("type", record.type);
-                glucoseData.put("sampleLocation", record.sampleLocationInteger);
+                glucoseData.put("sampleLocation", record.sampleLocation);
+                glucoseData.put("sampleLocationInteger", record.sampleLocationInteger);
                 // Thêm trạng thái cảm biến nếu có
                 if (record.sensorStatusAnnunciation != null) {
                     HashMap<String, Boolean> sensorStatus = new HashMap<>();
@@ -2475,7 +2477,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 glucoseMeasurementList.add(glucoseData);
             }
             HashMap<String, Object> glucoseDataRecords = new HashMap<>();
-            glucoseDataRecords.put("response", glucoseMeasurementList);
+            glucoseDataRecords.put("glucoseDataRecords", glucoseMeasurementList);
 
             // Gửi danh sách dữ liệu sang Flutter
             invokeMethodUIThread("OnGlucoseRecordsReceived", glucoseDataRecords);
@@ -2499,9 +2501,12 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
                 // In nồng độ glucose và đơn vị đo
                 System.out.println("Nồng độ glucose: " + (record.glucoseConcentrationMeasurementUnit == GlucoseMeasurementRecord.GlucoseConcentrationMeasurementUnit.MOLES_PER_LITRE ? record.convertGlucoseConcentrationValueToMilligramsPerDeciliter() : record.convertGlucoseConcentrationValueToMilligramsPerDeciliter()));
+                System.out.println("Value: " + record.glucoseConcentrationValue);
 
                 // In loại mẫu và vị trí lấy mẫu
                 System.out.println("Loại mẫu: " + record.type);
+                System.out.println("Tên mẫu: " + record.testBloodType);
+                System.out.println("Where: " + record.sampleLocation);
                 System.out.println("Vị trí lấy mẫu: " + record.sampleLocationInteger);
 
                 // In trạng thái cảm biến nếu có
