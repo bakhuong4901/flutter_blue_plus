@@ -41,8 +41,14 @@ final class FlutterBluePlusAndroid extends FlutterBluePlusPlatform {
       StreamController<BmBluetoothDevice>.broadcast();
 
   // KHƯƠNG
-  // final _onGlucoseRecordController =
-  // StreamController<BmGlucoseRecordResponse>.broadcast();
+  final _onGlucoseRecordController =
+      StreamController<BmGlucoseRecordResponse>.broadcast();
+
+  @override
+  Stream<BmGlucoseRecordResponse> get onGlucoseRecordsReceived {
+    return _onGlucoseRecordController.stream;
+  }
+
   // KHƯƠNG
 
   @override
@@ -577,12 +583,21 @@ final class FlutterBluePlusAndroid extends FlutterBluePlusPlatform {
           ),
         );
       // KHƯƠNG
-      // case 'OnGlucoseRecordsReceived':
-      //   return _onServicesResetController.add(
-      //     BmGlucoseRecordResponse.fromMap(
-      //       call.arguments,
-      //     ),
-      //   );
+      case 'OnGlucoseRecordsReceived':
+        print("Raw data received: ${call.arguments}");
+        try {
+          final response = BmGlucoseRecordResponse.fromMap(call.arguments);
+          print("Parsed response: $response");
+          return _onGlucoseRecordController.add(response);
+        } catch (e, stacktrace) {
+          print("Error in fromMap: $e");
+          print("Stacktrace: $stacktrace");
+        }
+        return _onGlucoseRecordController.add(
+          BmGlucoseRecordResponse.fromMap(
+            call.arguments,
+          ),
+        );
 
       // KHƯƠNG
     }
