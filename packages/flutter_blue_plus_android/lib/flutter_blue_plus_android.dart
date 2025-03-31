@@ -586,7 +586,9 @@ final class FlutterBluePlusAndroid extends FlutterBluePlusPlatform {
       case 'OnGlucoseRecordsReceived':
         print("Raw data received: ${call.arguments}");
         try {
-          final response = BmGlucoseRecordResponse.fromMap(call.arguments);
+          final Map<String, dynamic> mappedData =
+              Map<String, dynamic>.from(call.arguments as Map);
+          final response = BmGlucoseRecordResponse.fromMap(mappedData);
           print("Parsed response: $response");
           return _onGlucoseRecordController.add(response);
         } catch (e, stacktrace) {
