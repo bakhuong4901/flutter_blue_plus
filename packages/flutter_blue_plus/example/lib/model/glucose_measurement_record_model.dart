@@ -11,7 +11,7 @@ class GlucoseMeasurementRecord {
   int? day;
   int? hours;
   int? minutes;
-  double? seconds;
+  int? seconds;
   int? timeOffset;
   String? glucoseConcentrationMeasurementUnit;
   double? glucoseConcentrationValue;
@@ -68,8 +68,13 @@ class BmGlucoseRecordResponse {
 
   factory BmGlucoseRecordResponse.fromMap(Map<dynamic, dynamic> json) {
     List<GlucoseMeasurementRecord> listGlucoseMeasurementRecord = [];
-    for (var item in json['glucoseDataRecords']) {
-      listGlucoseMeasurementRecord.add(GlucoseMeasurementRecord.fromMap(item));
+    if (json['glucoseDataRecords'] != null) {
+      // Cast List<dynamic> to List<Map<String, dynamic>>
+      final List<dynamic> records = json['glucoseDataRecords'] as List<dynamic>;
+      listGlucoseMeasurementRecord = records
+          .map((item) => GlucoseMeasurementRecord.fromMap(
+              Map<String, dynamic>.from(item as Map)))
+          .toList();
     }
     return BmGlucoseRecordResponse(
         listGlucoseMeasurementRecord: listGlucoseMeasurementRecord);

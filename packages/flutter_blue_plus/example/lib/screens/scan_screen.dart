@@ -22,7 +22,6 @@ class _ScanScreenState extends State<ScanScreen> {
   bool _isScanning = false;
   late StreamSubscription<List<ScanResult>> _scanResultsSubscription;
   late StreamSubscription<bool> _isScanningSubscription;
-  // late StreamSubscription<> _glucoseRecordResponseSubscription;
 
   @override
   void initState() {

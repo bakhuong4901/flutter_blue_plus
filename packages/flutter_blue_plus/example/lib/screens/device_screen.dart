@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus_library.dart';
+import 'package:flutter_blue_plus_example/model/glucose_measurement_record_model.dart';
+import 'package:flutter_blue_plus_example/screens/glucose_measurement_stream.dart';
 
 import '../widgets/service_tile.dart';
 import '../widgets/characteristic_tile.dart';
@@ -24,19 +26,31 @@ class _DeviceScreenState extends State<DeviceScreen> {
   BluetoothConnectionState _connectionState =
       BluetoothConnectionState.disconnected;
   List<BluetoothService> _services = [];
+
   bool _isDiscoveringServices = false;
   bool _isConnecting = false;
   bool _isDisconnecting = false;
-
+  final GlucoseMeasurementStream _glucoseStream = GlucoseMeasurementStream();
+  List<GlucoseMeasurementRecord> listGlucoseMeasurementRecord = [];
   late StreamSubscription<BluetoothConnectionState>
       _connectionStateSubscription;
   late StreamSubscription<bool> _isConnectingSubscription;
   late StreamSubscription<bool> _isDisconnectingSubscription;
   late StreamSubscription<int> _mtuSubscription;
+  late StreamSubscription<BmGlucoseRecordResponse>
+      _glucoseRecordResponseSubscription;
 
   @override
   void initState() {
     super.initState();
+    _glucoseStream.initialize();
+    _glucoseRecordResponseSubscription =
+        _glucoseStream.glucoseStream.listen((records) {
+      setState(() {
+        print('AHIHI${records.listGlucoseMeasurementRecord}');
+        listGlucoseMeasurementRecord = records.listGlucoseMeasurementRecord;
+      });
+    });
 
     _connectionStateSubscription =
         widget.device.connectionState.listen((state) async {
@@ -289,6 +303,15 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 'History IOT',
                 style: TextStyle(fontSize: 20),
               ),
+              Container(
+                height: 500,
+                child: ListView.builder(
+                    itemCount: listGlucoseMeasurementRecord.length,
+                    itemBuilder: (context, index) {
+                      final record = listGlucoseMeasurementRecord[index];
+                      return Text('${record.glucoseConcentrationValue}');
+                    }),
+              )
             ],
           ),
         ),

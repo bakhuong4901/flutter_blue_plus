@@ -41,13 +41,13 @@ final class FlutterBluePlusAndroid extends FlutterBluePlusPlatform {
       StreamController<BmBluetoothDevice>.broadcast();
 
   // KHƯƠNG
-  final _onGlucoseRecordController =
-      StreamController<BmGlucoseRecordResponse>.broadcast();
-
-  @override
-  Stream<BmGlucoseRecordResponse> get onGlucoseRecordsReceived {
-    return _onGlucoseRecordController.stream;
-  }
+  // final _onGlucoseRecordController =
+  //     StreamController<BmGlucoseRecordResponse>.broadcast();
+  //
+  // @override
+  // Stream<BmGlucoseRecordResponse> get onGlucoseRecordsReceived {
+  //   return _onGlucoseRecordController.stream;
+  // }
 
   // KHƯƠNG
 
@@ -583,23 +583,18 @@ final class FlutterBluePlusAndroid extends FlutterBluePlusPlatform {
           ),
         );
       // KHƯƠNG
-      case 'OnGlucoseRecordsReceived':
-        print("Raw data received: ${call.arguments}");
-        try {
-          final Map<String, dynamic> mappedData =
-              Map<String, dynamic>.from(call.arguments as Map);
-          final response = BmGlucoseRecordResponse.fromMap(mappedData);
-          print("Parsed response: $response");
-          return _onGlucoseRecordController.add(response);
-        } catch (e, stacktrace) {
-          print("Error in fromMap: $e");
-          print("Stacktrace: $stacktrace");
-        }
-        return _onGlucoseRecordController.add(
-          BmGlucoseRecordResponse.fromMap(
-            call.arguments,
-          ),
-        );
+      // case 'OnGlucoseRecordsReceived':
+      //   print("Raw data received: ${call.arguments}");
+      //   try {
+      //     final Map<String, dynamic> mappedData =
+      //         Map<String, dynamic>.from(call.arguments as Map);
+      //     final response = BmGlucoseRecordResponse.fromMap(mappedData);
+      //     print("Parsed response: $response");
+      //     return _onGlucoseRecordController.add(response);
+      //   } catch (e, stacktrace) {
+      //     print("Error in fromMap: $e");
+      //     print("Stacktrace: $stacktrace");
+      //   }
 
       // KHƯƠNG
     }

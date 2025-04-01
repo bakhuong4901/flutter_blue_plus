@@ -2154,7 +2154,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
                     // remove from cached PINs
                     mBondingPins.remove(remoteId);
-
+                    // KHƯƠNG
                     // Gửi broadcast thông báo thiết bị đã ngắt kết nối
                     bluetoothGattStateIntent.setAction(BluetoothGattStateInformationReceiver.BLUETOOTH_LE_GATT_ACTION_DISCONNECTED_FROM_DEVICE);
                     LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(context);
@@ -2434,7 +2434,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
             }
 
             // Gọi hàm để in ra danh sách các bản ghi đã xử lý
-            printGlucoseMeasurementRecords();
+//            printGlucoseMeasurementRecords();
 
             sendGlucoseRecordToFlutter(glucoseMeasurementRecords);
             //KHƯƠNG

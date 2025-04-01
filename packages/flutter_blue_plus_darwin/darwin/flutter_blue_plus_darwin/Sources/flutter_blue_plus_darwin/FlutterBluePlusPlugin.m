@@ -1313,6 +1313,7 @@ didDiscoverCharacteristicsForService:(CBService *)service
     }
 }
 
+// KHƯƠNG
 - (void)                     peripheral:(CBPeripheral *)peripheral
 didDiscoverDescriptorsForCharacteristic:(CBCharacteristic *)characteristic
                                   error:(NSError *)error {
@@ -1350,10 +1351,12 @@ didDiscoverDescriptorsForCharacteristic:(CBCharacteristic *)characteristic
             @"error_string": error ? [error localizedDescription] : @"success",
             @"error_code": error ? @(error.code) : @(0),
     };
+    // 🩸 Tìm dịch vụ đo đường huyết (Glucose Service)
 
     // Send updated tree
     [self.methodChannel invokeMethod:@"OnDiscoveredServices" arguments:response];
 }
+// KHƯƠNG
 
 - (void)                   peripheral:(CBPeripheral *)peripheral
 didDiscoverIncludedServicesForService:(CBService *)service
