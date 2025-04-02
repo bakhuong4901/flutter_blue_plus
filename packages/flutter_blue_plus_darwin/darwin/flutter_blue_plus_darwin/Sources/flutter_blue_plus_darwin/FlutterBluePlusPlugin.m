@@ -3,6 +3,11 @@
 // BSD-style license that can be found in the LICENSE file.
 
 #import "./include/flutter_blue_plus_darwin/FlutterBluePlusPlugin.h"
+#import "./include/flutter_blue_plus_darwin/GlucoseProfileConfiguration.h"
+#import "./include/flutter_blue_plus_darwin/GlucoseMeasurementRecord.h"
+#import "./include/flutter_blue_plus_darwin/SensorStatusAnnunciation.h"
+#import "./include/flutter_blue_plus_darwin/BluetoothGattStateInformationReceiver.h"
+#import <CoreBluetooth/CoreBluetooth.h>
 
 #define Log(LEVEL, FORMAT, ...) [self log:LEVEL format:@"[FBP-iOS] " FORMAT, ##__VA_ARGS__]
 // 2902 là UUID của Client Characteristic Configuration Descriptor (CCCD), dùng để bật/tắt notify/indicate trên BLE.
@@ -486,7 +491,7 @@ LNONE = 0,
 
             // check maximum payload
             int maxLen = [self getMaxPayload:peripheral forType:writeType allowLongWrite:[allowLongWrite boolValue]];
-            int dataLen = value.length;
+            int dataLen = (int) value.length;
             if (dataLen > maxLen) {
                 NSString *t =
                         [writeTypeNumber intValue] == 0 ? @"withResponse" : @"withoutResponse";
@@ -609,7 +614,7 @@ LNONE = 0,
 
             // check mtu
             int mtu = (int) [self getMtu:peripheral];
-            int dataLen = value.length;
+            int dataLen = (int) value.length;
             if ((mtu - 3) < dataLen) {
                 NSString *f = @"data is longer than MTU allows. dataLen: %d > maxDataLen: %d";
                 NSString *s = [NSString stringWithFormat:f, dataLen, (mtu - 3)];
@@ -1313,7 +1318,34 @@ didDiscoverCharacteristicsForService:(CBService *)service
     }
 }
 
-// KHƯƠNG
+/// KHƯƠNG (Giống với setCharacteristicClientConfigDescriptor of SUGAIOT and JAVA)
+- (BOOL)setCharacteristicClientConfigDescriptor:(CBPeripheral *)peripheral
+                                 characteristic:(CBCharacteristic *)characteristic
+                                          value:(NSData *)value {
+    // Bật thông báo cho characteristic
+    [peripheral setNotifyValue:YES forCharacteristic:characteristic];
+
+    // Lấy descriptor và gán giá trị
+    CBDescriptor *clientCharacteristicConfigDesc = nil;
+    for (CBDescriptor *descriptor in characteristic.descriptors) {
+        if ([descriptor.UUID isEqual:[CBUUID UUIDWithString:CLIENT_CHARACTERISTICS_CONFIGURATION_DESCRIPTOR]]) {
+            clientCharacteristicConfigDesc = descriptor;
+            break;
+        }
+    }
+
+    if (clientCharacteristicConfigDesc) {
+        [clientCharacteristicConfigDesc setValue:value];
+        // Viết descriptor
+        [peripheral writeValue:value forDescriptor:clientCharacteristicConfigDesc];
+        return YES;
+    }
+
+    return NO;
+}
+/// KHƯƠNG
+
+/// KHƯƠNG - Xử lý khi tìm thấy dịch vụ UUID đã cấu hình
 - (void)                     peripheral:(CBPeripheral *)peripheral
 didDiscoverDescriptorsForCharacteristic:(CBCharacteristic *)characteristic
                                   error:(NSError *)error {
@@ -1322,22 +1354,23 @@ didDiscoverDescriptorsForCharacteristic:(CBCharacteristic *)characteristic
         Log(LERROR, @"  chr: %@", [characteristic.UUID uuidStr]);
         Log(LERROR, @"  error: %@", [error localizedDescription]);
     } else {
+        // KHƯƠNG cái này in ra UUIDs của thiết bị tiểu đường
         Log(LDEBUG, @"didDiscoverDescriptorsForCharacteristic:");
-        Log(LDEBUG, @"  chr: %@", [characteristic.UUID uuidStr]);
+        Log(LDEBUG, @" UUID chr: %@", [characteristic.UUID uuidStr]);
     }
 
-    // print descriptors
+    // print descriptors - mô tả đặc tính
     for (CBDescriptor *d in [characteristic descriptors]) {
         Log(LDEBUG, @"    desc: %@", [d.UUID uuidStr]);
     }
 
-    // have we finished discovering?
+    // have we finished discovering? - Đã khám phá xong chưa?
     [self.characteristicsToDiscover removeObject:characteristic];
     if (self.servicesToDiscover.count > 0 || self.characteristicsToDiscover.count > 0) {
         return; // Still discovering
     }
 
-    // Add BmBluetoothServices to array
+    // Add BmBluetoothServices to array - Thêm vào mảng
     NSMutableArray *services = [NSMutableArray new];
     for (CBService *s in [peripheral services]) {
         [services addObject:[self bmBluetoothService:peripheral service:s]];
@@ -1352,11 +1385,39 @@ didDiscoverDescriptorsForCharacteristic:(CBCharacteristic *)characteristic
             @"error_code": error ? @(error.code) : @(0),
     };
     // 🩸 Tìm dịch vụ đo đường huyết (Glucose Service)
+    // Lấy dịch vụ Glucose
+    CBService *glucoseService = nil;
+    for (CBService *service in peripheral.services) {
+        if ([service.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_SERVICE_UUID]]) {
+            glucoseService = service;
+            break;
+        }
+    }
+    if (glucoseService) {
+        // Lấy đặc tính đo glucose
+        CBCharacteristic *glucoseMeasurementCharacteristic = nil;
+        for (CBCharacteristic *characteristic in glucoseService.characteristics) {
+            if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID]]) {
+                glucoseMeasurementCharacteristic = characteristic;
+                break;
+            }
+        }
+
+        if (glucoseMeasurementCharacteristic) {
+            // Thiết lập thông báo cho đặc tính đo glucose
+            [peripheral setNotifyValue:YES forCharacteristic:glucoseMeasurementCharacteristic];
+
+            // Gửi giá trị descriptor (thông báo)
+            [self setCharacteristicClientConfigDescriptor:peripheral
+                                           characteristic:glucoseMeasurementCharacteristic
+                                                    value:[NSData dataWithBytes:&BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE length:sizeof(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)]];
+        }
+    }
 
     // Send updated tree
     [self.methodChannel invokeMethod:@"OnDiscoveredServices" arguments:response];
 }
-// KHƯƠNG
+/// KHƯƠNG
 
 - (void)                   peripheral:(CBPeripheral *)peripheral
 didDiscoverIncludedServicesForService:(CBService *)service
