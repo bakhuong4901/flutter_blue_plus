@@ -52,6 +52,8 @@ LNONE = 0,
 @property(nonatomic) LogLevel logLevel; // Mức độ ghi log.
 @property(nonatomic) NSNumber *showPowerAlert;
 @property(nonatomic) NSNumber *restoreState;
+@property(strong, nonatomic) CBService *glucoseService;
+
 @end
 
 // Khởi tạo method channel để Flutter có thể gọi qua native
@@ -849,6 +851,7 @@ LNONE = 0,
     return nil;
 }
 
+//Hàm lấy Characteristic từ Service
 - (CBCharacteristic *)getCharacteristicFromArray:(NSString *)uuid array:(NSArray
 
 <CBCharacteristic *> *)array
@@ -1220,6 +1223,11 @@ didDisconnectPeripheral:(CBPeripheral *)peripheral
 
     // See BmConnectionStateResponse
     // Gửi sự kiện mất kết nối về Flutter
+    //KHƯƠNG Gửi broadcast thông báo ngắt kết nối
+    [[NSNotificationCenter defaultCenter] postNotificationName:BLUETOOTH_LE_GATT_ACTION_DISCONNECTED_FROM_DEVICE
+                                                        object:nil
+                                                      userInfo:@{@"peripheral": peripheral}];
+    // KHƯƠNG
     NSDictionary *result = @{
             @"remote_id": remoteId,
             @"connection_state": @([self bmConnectionStateEnum:peripheral.state]),
@@ -1274,30 +1282,79 @@ didFailToConnectPeripheral:(CBPeripheral *)peripheral
 // ██   ██  ██       ██       ██       ██    ██  ██   ██     ██     ██               
 // ██████   ███████  ███████  ███████   ██████   ██   ██     ██     ███████ 
 
-
+/// KHƯƠNG - Xử lý khi tìm thấy dịch vụ UUID đã cấu hình
 - (void) peripheral:(CBPeripheral *)peripheral
-// tìm kiếm dịch vụ UUID của BLE (MÁY)
-didDiscoverServices:(NSError *)error {
+// tìm kiếm dịch vụ UUID của BLE (MÁY) - Tìm dịch vụ glucose sau khi peripheral đã khám phá các dịch vụ.
+// ➡️ Tiếp theo sẽ đến didDiscoverCharacteristicsForService
+didDiscoverServices:(NSError *)error { // - AS onServicesDiscovered
     if (error) {
         Log(LERROR, @"didDiscoverServices:");
         Log(LERROR, @"  error: %@", [error localizedDescription]);
     } else {
         Log(LDEBUG, @"didDiscoverServices:");
     }
-
-    // discover characteristics and included services
+    // discover characteristics and included services - khám phá các đặc điểm và dịch vụ đi kèm
     [self.servicesToDiscover addObjectsFromArray:peripheral.services];
     for (CBService *s in [peripheral services]) {
-        Log(LDEBUG, @"  svc: %@", [s.UUID uuidStr]);
-//        Log(@"🔍 Tìm thấy dịch vụ: %@", [s.UUID uuidStr]);
+        Log(LDEBUG, @"svc: %@", [s.UUID uuidStr]);
         [peripheral discoverCharacteristics:nil forService:s];
         [peripheral discoverIncludedServices:nil forService:s];
     }
-}
+    // KHƯƠNG
+    // Tìm glucose service
+    for (CBService *service in peripheral.services) {
+        NSLog(@"Service found: %@", [service.UUID UUIDString]);
+        if ([service.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_SERVICE_UUID]]) {
+            self.glucoseService = service;
+            NSLog(@"✅ Found Glucose Service: %@", service.UUID.UUIDString);
+            break;
+        }
+    }
 
+//    if (glucoseService) {
+//        // 🩸 Tìm dịch vụ đo đường huyết (Glucose Service)
+//        for (CBCharacteristic *characteristic in glucoseService.characteristics) {
+//            NSLog(@"✅ Found Glucose Measurement Characteristic: %@",
+//                  characteristic.UUID.UUIDString);
+//            if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID]]) {
+////                NSLog(@"✅ Found Glucose Measurement Characteristic: %@",
+////                      characteristic.UUID.UUIDString);
+//
+//                // Thiết lập thông báo cho characteristic
+//                // Tương đương với ENABLE_NOTIFICATION_VALUE trong Android
+//                uint8_t notifyValue[] = {0x01, 0x00}; // Enable notifications
+//                NSData *notifyData = [NSData dataWithBytes:notifyValue length:sizeof(notifyValue)];
+//
+//                // Thiết lập descriptor để bật thông báo
+//                BOOL success = [self setCharacteristicClientConfigDescriptor:peripheral
+//                                                              characteristic:characteristic
+//                                                                       value:notifyData];
+//
+//                if (success) {
+//                    NSLog(@"✅ Successfully enabled notifications for Glucose Measurement");
+//                } else {
+//                    NSLog(@"❌ Failed to enable notifications for Glucose Measurement");
+//                }
+//
+//                break;
+//            }
+//        }
+//    } else {
+//        NSLog(@"❌ Glucose Service not found");
+//    }
+
+    // Khám phá các characteristics cho tất cả các services
+//    for (CBService *service in peripheral.services) {
+//        [peripheral discoverCharacteristics:nil forService:service];
+//    }
+}
+/// KHƯƠNG
+
+
+// Callback khi tìm thấy characteristics
 - (void)                  peripheral:(CBPeripheral *)peripheral
 // Lấy danh sách các đặc tính (characteristics) của dịch vụ BLE.
-// Sử dụng để bật tắt thông báo trên 1 characteristic trong BLE.
+// Khi đặc tính được phát hiện, nó tìm đặc tính đo glucose và bật thông báo (setNotifyValue:YES).
 didDiscoverCharacteristicsForService:(CBService *)service
                                error:(NSError *)error {
     if (error) {
@@ -1316,36 +1373,64 @@ didDiscoverCharacteristicsForService:(CBService *)service
         Log(LDEBUG, @"    chr: %@", [c.UUID uuidStr]);
         [peripheral discoverDescriptorsForCharacteristic:c];
     }
+    // KHUONG
+    if ([service.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_SERVICE_UUID]]) {
+        for (CBCharacteristic *characteristic in service.characteristics) {
+            if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID]]) {
+                // Thiết lập thông báo cho đặc tính đo glucose
+//                [peripheral setNotifyValue:YES forCharacteristic:characteristic];
+//                break;
+                NSData *enableNotificationValue = [NSData dataWithBytes:&(uint16_t) {
+                        0x01}                                    length:sizeof(uint16_t)];
+                if (![self setCharacteristicClientConfigDescriptor:peripheral characteristic:characteristic value:enableNotificationValue]) {
+                    NSLog(@"❌ Không thể thiết lập thông báo cho characteristic: %@",
+                          characteristic.UUID.UUIDString);
+                }
+                break;
+            }
+        }
+        // KHUONG
+
+
+    }
 }
 
 /// KHƯƠNG (Giống với setCharacteristicClientConfigDescriptor of SUGAIOT and JAVA)
 - (BOOL)setCharacteristicClientConfigDescriptor:(CBPeripheral *)peripheral
                                  characteristic:(CBCharacteristic *)characteristic
                                           value:(NSData *)value {
-    // Bật thông báo cho characteristic
+    // 🔹 1. Kích hoạt thông báo cho đặc tính (Bật Notify/Indicate)
     [peripheral setNotifyValue:YES forCharacteristic:characteristic];
+    // 🔹 2. Lấy UUID của Client Characteristic Configuration Descriptor (CCCD)
+    CBUUID *configDescriptorUUID = [CBUUID UUIDWithString:CLIENT_CHARACTERISTICS_CONFIGURATION_DESCRIPTOR];
 
-    // Lấy descriptor và gán giá trị
+    // 🔹 3. Tìm descriptor phù hợp trong danh sách descriptors của characteristic
     CBDescriptor *clientCharacteristicConfigDesc = nil;
     for (CBDescriptor *descriptor in characteristic.descriptors) {
-        if ([descriptor.UUID isEqual:[CBUUID UUIDWithString:CLIENT_CHARACTERISTICS_CONFIGURATION_DESCRIPTOR]]) {
+        if ([descriptor.UUID isEqual:configDescriptorUUID]) {
             clientCharacteristicConfigDesc = descriptor;
             break;
         }
     }
 
+    // 🔹 4. Nếu tìm thấy descriptor, ghi giá trị vào nó
     if (clientCharacteristicConfigDesc) {
-        [clientCharacteristicConfigDesc setValue:value];
-        // Viết descriptor
-        [peripheral writeValue:value forDescriptor:clientCharacteristicConfigDesc];
+        NSLog(@"✅ CCCD đã được tìm thấy, tiến hành ghi giá trị.");
+        // chỉ ghi được vào Characteristic mới đau
+//        [peripheral writeValue:value forDescriptor:clientCharacteristicConfigDesc];
+
+        // 🔹 5. Gọi trực tiếp `didWriteValueForDescriptor`
+        [self peripheral:peripheral didWriteValueForDescriptor:clientCharacteristicConfigDesc error:nil];
+
         return YES;
     }
 
+    NSLog(@"❌ Không tìm thấy Client Characteristic Configuration Descriptor.");
     return NO;
+
 }
 /// KHƯƠNG
 
-/// KHƯƠNG - Xử lý khi tìm thấy dịch vụ UUID đã cấu hình
 - (void)                     peripheral:(CBPeripheral *)peripheral
 didDiscoverDescriptorsForCharacteristic:(CBCharacteristic *)characteristic
                                   error:(NSError *)error {
@@ -1356,7 +1441,7 @@ didDiscoverDescriptorsForCharacteristic:(CBCharacteristic *)characteristic
     } else {
         // KHƯƠNG cái này in ra UUIDs của thiết bị tiểu đường
         Log(LDEBUG, @"didDiscoverDescriptorsForCharacteristic:");
-        Log(LDEBUG, @" UUID chr: %@", [characteristic.UUID uuidStr]);
+        Log(LDEBUG, @"KHUONG UUID chr: %@", [characteristic.UUID uuidStr]);
     }
 
     // print descriptors - mô tả đặc tính
@@ -1385,39 +1470,72 @@ didDiscoverDescriptorsForCharacteristic:(CBCharacteristic *)characteristic
             @"error_code": error ? @(error.code) : @(0),
     };
     // 🩸 Tìm dịch vụ đo đường huyết (Glucose Service)
-    // Lấy dịch vụ Glucose
-    CBService *glucoseService = nil;
-    for (CBService *service in peripheral.services) {
-        if ([service.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_SERVICE_UUID]]) {
-            glucoseService = service;
-            break;
-        }
-    }
-    if (glucoseService) {
-        // Lấy đặc tính đo glucose
-        CBCharacteristic *glucoseMeasurementCharacteristic = nil;
-        for (CBCharacteristic *characteristic in glucoseService.characteristics) {
-            if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID]]) {
-                glucoseMeasurementCharacteristic = characteristic;
-                break;
-            }
-        }
+    // Tìm lấy dịch vụ Glucose
+//    CBService *glucoseService = nil;
+//    for (CBService *service in peripheral.services) {
+//        if ([service.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_SERVICE_UUID]]) {
+//            glucoseService = service;
+//            NSLog(@"✅ Found Glucose Service: %@", service.UUID.UUIDString);
+//            break;
+//        }
+//    }
+//    if (glucoseService) {
+//        // Lấy đặc tính đo glucose
+//        CBCharacteristic *glucoseMeasurementCharacteristic = nil;
+//        for (CBCharacteristic *characteristic in glucoseService.characteristics) {
+//            if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID]]) {
+//                glucoseMeasurementCharacteristic = characteristic;
+//                // Thêm log để in thông tin
+//                NSLog(@"🩸 Found Glucose Measurement Characteristic:");
+//                NSLog(@"   - UUID: %@", characteristic.UUID.UUIDString);
+//                NSLog(@"   - Properties: %lu", (unsigned long) characteristic.properties);
+//                NSLog(@"   - Is Notifying: %@", characteristic.isNotifying ? @"YES" : @"NO");
+//
+//                // In ra các properties cụ thể
+//                if (characteristic.properties & CBCharacteristicPropertyRead)
+//                    NSLog(@"   - Can Read");
+//                if (characteristic.properties & CBCharacteristicPropertyWrite)
+//                    NSLog(@"   - Can Write");
+//                if (characteristic.properties & CBCharacteristicPropertyNotify)
+//                    NSLog(@"   - Can Notify");
+//                if (characteristic.properties & CBCharacteristicPropertyIndicate)
+//                    NSLog(@"   - Can Indicate");
+//
+//                // In ra các descriptors nếu có
+//                if (characteristic.descriptors) {
+//                    NSLog(@"   - Descriptors:");
+//                    for (CBDescriptor *descriptor in characteristic.descriptors) {
+//                        NSLog(@"     + %@", descriptor.UUID.UUIDString);
+//                    }
+//                }
+//                break;
+//            }
+//        }
+//
+//        if (glucoseMeasurementCharacteristic) {
+//            // Thiết lập thông báo cho đặc tính đo glucose
+//            [peripheral setNotifyValue:YES forCharacteristic:glucoseMeasurementCharacteristic];
+//
+//            // Gửi giá trị descriptor (thông báo)
+//            [self setCharacteristicClientConfigDescriptor:peripheral
+//                                           characteristic:glucoseMeasurementCharacteristic
+//                                                    value:[NSData dataWithBytes:&BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE length:sizeof(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)]];
+//        }
+//        if (glucoseMeasurementCharacteristic) {
+////            [peripheral setNotifyValue:YES forCharacteristic:glucoseMeasurementCharacteristic];
+//
+//            uint8_t notifyValue = 1;
+//            NSData *notifyData = [NSData dataWithBytes:&notifyValue length:sizeof(notifyValue)];
+//
+//            [self setCharacteristicClientConfigDescriptor:peripheral
+//                                           characteristic:glucoseMeasurementCharacteristic
+//                                                    value:notifyData];
+//        }
+//}
 
-        if (glucoseMeasurementCharacteristic) {
-            // Thiết lập thông báo cho đặc tính đo glucose
-            [peripheral setNotifyValue:YES forCharacteristic:glucoseMeasurementCharacteristic];
-
-            // Gửi giá trị descriptor (thông báo)
-            [self setCharacteristicClientConfigDescriptor:peripheral
-                                           characteristic:glucoseMeasurementCharacteristic
-                                                    value:[NSData dataWithBytes:&BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE length:sizeof(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)]];
-        }
-    }
-
-    // Send updated tree
+// Send updated tree
     [self.methodChannel invokeMethod:@"OnDiscoveredServices" arguments:response];
 }
-/// KHƯƠNG
 
 - (void)                   peripheral:(CBPeripheral *)peripheral
 didDiscoverIncludedServicesForService:(CBService *)service
@@ -1598,8 +1716,9 @@ didUpdateValueForDescriptor:(CBDescriptor *)descriptor
     [self.methodChannel invokeMethod:@"OnDescriptorRead" arguments:result];
 }
 
+// Hàm ghi Descriptor để nhận dữ liệu
 - (void)        peripheral:(CBPeripheral *)peripheral
-didWriteValueForDescriptor:(CBDescriptor *)descriptor
+didWriteValueForDescriptor:(CBDescriptor *)descriptor // = onDescriptorWrite trong JAVA
                      error:(NSError *)error {
     if (error) {
         Log(LERROR, @"didWriteValueForDescriptor:");
@@ -1645,6 +1764,54 @@ didWriteValueForDescriptor:(CBDescriptor *)descriptor
     if (!primaryService) { [result removeObjectForKey:@"primary_service_uuid"]; }
 
     [self.methodChannel invokeMethod:@"OnDescriptorWritten" arguments:result];
+    if (!descriptor || !peripheral) {
+        NSLog(@"❌ Descriptor hoặc Peripheral không hợp lệ.");
+        return;
+    }
+    CBUUID *characteristicUUID = descriptor.characteristic.UUID;
+    NSLog(@"|||||||", descriptor.characteristic.UUID);
+
+//    if ([characteristicUUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID]]) {
+//        CBCharacteristic *glucoseMeasurementContextCharacteristic = [self.glucoseService
+//                characteristicWithUUID:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID]];
+//
+//        if (glucoseMeasurementContextCharacteristic) {
+//            NSData *enableNotificationValue = [NSData dataWithBytes:&(uint16_t){0x01} length:sizeof(uint16_t)];
+//            [self setCharacteristicClientConfigDescriptor:peripheral
+//                                           characteristic:glucoseMeasurementContextCharacteristic
+//                                                    value:enableNotificationValue];
+//        } else {
+//            CBCharacteristic *recordControlAccessPointCharacteristic = [self.glucoseService
+//                    characteristicWithUUID:[CBUUID UUIDWithString:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID]];
+//            NSData *enableIndicationValue = [NSData dataWithBytes:&(uint16_t){0x02} length:sizeof(uint16_t)];
+//            [self setCharacteristicClientConfigDescriptor:peripheral
+//                                           characteristic:recordControlAccessPointCharacteristic
+//                                                    value:enableIndicationValue];
+//        }
+//    }
+//    else if ([characteristicUUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID]]) {
+//        CBCharacteristic *recordAccessControlPointCharacteristic = [self.glucoseService
+//                characteristicWithUUID:[CBUUID UUIDWithString:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID]];
+//        NSData *enableIndicationValue = [NSData dataWithBytes:&(uint16_t){0x02} length:sizeof(uint16_t)];
+//        [self setCharacteristicClientConfigDescriptor:peripheral
+//                                       characteristic:recordAccessControlPointCharacteristic
+//                                                value:enableIndicationValue];
+//    }
+//    else if ([characteristicUUID isEqual:[CBUUID UUIDWithString:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID]]) {
+//        NSLog(@"✅ Indication đã được thiết lập cho Record Access Control Point.");
+//        CBCharacteristic *racp = [peripheral.services.firstObject
+//                characteristicWithUUID:[CBUUID UUIDWithString:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID]];
+//
+//        if (racp) {
+//            uint8_t opCode = OP_CODE_REPORT_STORED_RECORDS;
+//            uint8_t operator = OPERATOR_ALL_RECORDS;
+//            NSMutableData *command = [NSMutableData data];
+//            [command appendBytes:&opCode length:sizeof(opCode)];
+//            [command appendBytes:&operator length:sizeof(operator)];
+//
+//            [peripheral writeValue:command forCharacteristic:racp type:CBCharacteristicWriteWithResponse];
+//        }
+//    }
 }
 
 - (void)peripheralDidUpdateName:(CBPeripheral *)peripheral {

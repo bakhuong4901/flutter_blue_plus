@@ -2610,6 +2610,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
             invokeMethodUIThread("OnDescriptorRead", response);
         }
 
+        // Ghi Descript để nhận diện dữ liệu
         @Override
         public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
             // Nếu status == 0 (tương đương với BluetoothGatt.GATT_SUCCESS)

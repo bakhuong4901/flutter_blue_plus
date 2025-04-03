@@ -1,41 +1,35 @@
-// BluetoothGattStateInformationReceiver.h
 #import <Foundation/Foundation.h>
 #import <CoreBluetooth/CoreBluetooth.h>
+#import "GlucoseMeasurementRecord.h"
 
-NS_ASSUME_NONNULL_BEGIN
+@protocol BluetoothGattStateInformationCallback <NSObject>
+// Gửi dữ liệu đo đường huyết nhận được từ thiết bị bluetooth
+- (void)glucoseMeasurementRecordAvailable:(GlucoseMeasurementRecord *)glucoseMeasurementRecord;
 
-@protocol BluetoothGattStateInformationDelegate <NSObject>
-
-// Gửi dữ liệu đo đường huyết nhận được từ thiết bị Bluetooth
-- (void)glucoseMeasurementRecordAvailable:(NSDictionary *)glucoseMeasurementRecord;
-
-// Gọi khi thiết bị kết nối thành công với GATT Server
+// Gọi khi thiết bị kết nối thành công với GATT SERVER
 - (void)connectedToAGattServer:(CBPeripheral *)connectedDevice;
 
-// Gọi khi thiết bị bị ngắt kết nối khỏi GATT Server
+// Gọi khi thiết bị bị ngắt kết nối khỏi GATT server
 - (void)disconnectedFromAGattServer;
 
 // Xử lý trạng thái ghép đôi Bluetooth
-- (void)bondStateExtra:(NSInteger)bondState;
+- (void)bondStateExtra:(NSInteger)boundState;
 
 // Gọi khi toàn bộ dữ liệu đo đường huyết đã được gửi xong
 - (void)recordsSentComplete;
-
 @end
 
 @interface BluetoothGattStateInformationReceiver : NSObject
 
-@property (nonatomic, weak) id<BluetoothGattStateInformationDelegate> delegate;
+// Constants
+extern NSString *const BLUETOOTH_LE_GATT_ACTION_CONNECTED_TO_DEVICE;
+extern NSString *const BLUETOOTH_LE_GATT_ACTION_DISCONNECTED_FROM_DEVICE;
+extern NSString *const BLUETOOTH_LE_GATT_ACTION_GLUCOSE_MEASUREMENT_RECORD_AVAILABLE;
+extern NSString *const BLUETOOTH_LE_GATT_GLUCOSE_MEASUREMENT_RECORD_EXTRA;
+extern NSString *const DEVICE_CONNECTED_TO_EXTRA;
+extern NSString *const RECORDS_SENT_COMPLETE;
 
-// Khởi tạo với delegate
-- (instancetype)initWithDelegate:(id<BluetoothGattStateInformationDelegate>)delegate;
-
-// Đăng ký để lắng nghe thông báo Bluetooth
-- (void)registerForBluetoothNotifications;
-
-// Hủy đăng ký lắng nghe thông báo Bluetooth
-- (void)unregisterFromBluetoothNotifications;
+- (instancetype)initWithCallback:(id<BluetoothGattStateInformationCallback>)callback;
+- (void)handleEvent:(NSString *)action withUserInfo:(NSDictionary *)userInfo;
 
 @end
-
-        NS_ASSUME_NONNULL_END

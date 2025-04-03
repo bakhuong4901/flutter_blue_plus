@@ -18,6 +18,7 @@
 @end
 
 @interface FlutterBluePlusStreamHandler : NSObject<FlutterStreamHandler>
+@property (strong, nonatomic) CBService *glucoseService;
 @property FlutterEventSink sink;
 @property NSDictionary *cachedBluetoothAdapterState;
 @end

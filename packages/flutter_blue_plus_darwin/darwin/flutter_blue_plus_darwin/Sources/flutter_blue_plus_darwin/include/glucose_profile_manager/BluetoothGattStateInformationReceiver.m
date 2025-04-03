@@ -1,65 +1,45 @@
-// BluetoothGattStateInformationReceiver.m
 #import "BluetoothGattStateInformationReceiver.h"
 #import <CoreBluetooth/CoreBluetooth.h>
 
+
+NSString *const BLUETOOTH_LE_GATT_ACTION_CONNECTED_TO_DEVICE = @"BLUETOOTH_LE_GATT_ACTION_CONNECTED_TO_DEVICE";
+NSString *const BLUETOOTH_LE_GATT_ACTION_DISCONNECTED_FROM_DEVICE = @"BLUETOOTH_LE_GATT_ACTION_DISCONNECTED_FROM_DEVICE";
+NSString *const BLUETOOTH_LE_GATT_ACTION_GLUCOSE_MEASUREMENT_RECORD_AVAILABLE = @"BLUETOOTH_LE_GATT_ACTION_GLUCOSE_MEASUREMENT_RECORD_AVAILABLE";
+NSString *const BLUETOOTH_LE_GATT_GLUCOSE_MEASUREMENT_RECORD_EXTRA = @"BLUETOOTH_LE_GATT_GLUCOSE_MEASUREMENT_RECORD_EXTRA";
+NSString *const DEVICE_CONNECTED_TO_EXTRA = @"DEVICE_CONNECTED_TO_EXTRA";
+NSString *const RECORDS_SENT_COMPLETE = @"RECORDS_SENT_COMPLETE";
+
+@interface BluetoothGattStateInformationReceiver ()
+@property(nonatomic, weak) id <BluetoothGattStateInformationCallback> callback;
+@end
+
 @implementation BluetoothGattStateInformationReceiver
 
-- (instancetype)initWithDelegate:(id<BluetoothGattStateInformationDelegate>)delegate {
+- (instancetype)initWithCallback:(id <BluetoothGattStateInformationCallback>)callback {
     self = [super init];
     if (self) {
-        _delegate = delegate;
+        _callback = callback;
     }
     return self;
 }
 
-- (void)registerForBluetoothNotifications {
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(handleBluetoothNotification:)
-                                                 name:CBPeripheralDidConnectNotification
-                                               object:nil];
-
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(handleBluetoothNotification:)
-                                                 name:CBPeripheralDidDisconnectNotification
-                                               object:nil];
-
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(handleBluetoothNotification:)
-                                                 name:@"GlucoseMeasurementRecordAvailable"
-                                               object:nil];
-
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(handleBluetoothNotification:)
-                                                 name:@"RecordsSentComplete"
-                                               object:nil];
-}
-
-- (void)unregisterFromBluetoothNotifications {
-    [[NSNotificationCenter defaultCenter] removeObserver:self];
-}
-
-- (void)handleBluetoothNotification:(NSNotification *)notification {
-    if ([notification.name isEqualToString:CBPeripheralDidConnectNotification]) {
-        CBPeripheral *connectedDevice = notification.object;
-        if ([self.delegate respondsToSelector:@selector(connectedToAGattServer:)]) {
-            [self.delegate connectedToAGattServer:connectedDevice];
+- (void)handleEvent:(NSString *)action withUserInfo:(NSDictionary *)userInfo {
+    if ([action isEqualToString:BLUETOOTH_LE_GATT_ACTION_CONNECTED_TO_DEVICE]) {
+        CBPeripheral *connectedDevice = userInfo[DEVICE_CONNECTED_TO_EXTRA];
+        if (connectedDevice) {
+            [self.callback connectedToAGattServer:connectedDevice];
         }
-    }
-    else if ([notification.name isEqualToString:CBPeripheralDidDisconnectNotification]) {
-        if ([self.delegate respondsToSelector:@selector(disconnectedFromAGattServer)]) {
-            [self.delegate disconnectedFromAGattServer];
+    } else if ([action isEqualToString:BLUETOOTH_LE_GATT_ACTION_DISCONNECTED_FROM_DEVICE]) {
+        [self.callback disconnectedFromAGattServer];
+    } else if ([action isEqualToString:BLUETOOTH_LE_GATT_ACTION_GLUCOSE_MEASUREMENT_RECORD_AVAILABLE]) {
+        @synchronized (self) {
+            GlucoseMeasurementRecord *record = userInfo[BLUETOOTH_LE_GATT_GLUCOSE_MEASUREMENT_RECORD_EXTRA];
+            if (record) {
+                [self.callback glucoseMeasurementRecordAvailable:record];
+            }
         }
-    }
-    else if ([notification.name isEqualToString:@"GlucoseMeasurementRecordAvailable"]) {
-        NSDictionary *glucoseMeasurementRecord = notification.userInfo;
-        if ([self.delegate respondsToSelector:@selector(glucoseMeasurementRecordAvailable:)]) {
-            [self.delegate glucoseMeasurementRecordAvailable:glucoseMeasurementRecord];
-        }
-    }
-    else if ([notification.name isEqualToString:@"RecordsSentComplete"]) {
-        if ([self.delegate respondsToSelector:@selector(recordsSentComplete)]) {
-            [self.delegate recordsSentComplete];
-        }
+    } else if ([action isEqualToString:RECORDS_SENT_COMPLETE]) {
+        [self.callback recordsSentComplete];
     }
 }
 

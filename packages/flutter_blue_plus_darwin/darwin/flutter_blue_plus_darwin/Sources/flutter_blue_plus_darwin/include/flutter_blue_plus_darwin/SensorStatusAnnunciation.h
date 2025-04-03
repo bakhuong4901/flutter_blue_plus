@@ -1,4 +1,7 @@
 // SensorStatusAnnunciation.h
+//#ifndef SENSOR_STATUS_ANNUNCIATION_H
+//#define SENSOR_STATUS_ANNUNCIATION_H
+//#pragma once
 #import <Foundation/Foundation.h>
 
 NS_ASSUME_NONNULL_BEGIN
