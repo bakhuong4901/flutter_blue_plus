@@ -31,7 +31,8 @@
 
 // Phương thức chuyển đổi nồng độ glucose sang mg/dL
 - (NSString *)convertGlucoseConcentrationValueToMilligramsPerDeciliter {
-    return [NSString stringWithFormat:@"%.2f mg/dL", self.glucoseConcentrationValue * 100000];
+    return [NSString stringWithFormat:@"%.0f mg/dL", self.glucoseConcentrationValue * 100000];
+
 }
 
 // Cập nhật loại máu và vị trí mẫu

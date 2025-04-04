@@ -17,6 +17,7 @@ NSString *const CCCD = @"2902";
 - (NSString *)uuidStr;
 @end
 
+// LOG
 @implementation CBUUID (CBUUIDAdditionsFlutterBluePlus)
 - (NSString *)uuidStr {
     return [self.UUIDString lowercaseString];
@@ -53,6 +54,7 @@ LNONE = 0,
 @property(nonatomic) NSNumber *showPowerAlert;
 @property(nonatomic) NSNumber *restoreState;
 @property(strong, nonatomic) CBService *glucoseService;
+@property(strong, nonatomic) NSMutableArray *glucoseMeasurementRecords; // KHUONG Array to store glucose measurement records
 
 @end
 
@@ -76,6 +78,7 @@ LNONE = 0,
     instance.logLevel = LDEBUG;
     instance.showPowerAlert = @(YES);
     instance.restoreState = @(NO);
+    instance.glucoseMeasurementRecords = [NSMutableArray new]; // KHUONG
 
     [registrar addMethodCallDelegate:instance channel:methodChannel];
 }
@@ -864,6 +867,16 @@ LNONE = 0,
     return nil;
 }
 
+// KHUONG - Helper method to find characteristic by UUID
+- (CBCharacteristic *)findCharacteristic:(NSString *)uuidString inService:(CBService *)service {
+    for (CBCharacteristic *characteristic in service.characteristics) {
+        if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:uuidString]]) {
+            return characteristic;
+        }
+    }
+    return nil;
+}
+
 - (CBDescriptor *)getDescriptorFromArray:(NSString *)uuid array:(NSArray
 
 <CBDescriptor *> *)array
@@ -1161,8 +1174,8 @@ advertisementData
 }
 
 - (void)centralManager:(CBCentralManager *)central
-// Khi thiết bị BLE kết nối thành công.
-  didConnectPeripheral:(CBPeripheral *)peripheral {
+//KHƯƠNG Khi thiết bị BLE kết nối thành công.
+  didConnectPeripheral:(CBPeripheral *)peripheral { // = onConnectionStateChange JAVA Kết nối thành công
     Log(LDEBUG, @"didConnectPeripheral");
     NSLog(@"🔗 Đã kết nối với thiết bị BLE: %@", peripheral.name);
     NSString *remoteId = [[peripheral identifier] UUIDString];
@@ -1176,7 +1189,7 @@ advertisementData
     // Register self as delegate for peripheral - Đăng ký delegate để nhận sự kiện từ thiết bị
     peripheral.delegate = self;
     // Bắt đầu quét dịch vụ (giống gatt.discoverServices() trên Android)
-    [peripheral discoverServices:nil];
+    [peripheral discoverServices:nil]; // = gatt.discoverServices() (SUGAIOT)
 
     // See BmConnectionStateResponse
     // Gửi sự kiện kết nối thành công về Flutter
@@ -1193,7 +1206,7 @@ advertisementData
 
 - (void) centralManager:(CBCentralManager *)central
 // Khi thiết bị BLE bị ngắt kết nối.
-didDisconnectPeripheral:(CBPeripheral *)peripheral
+didDisconnectPeripheral:(CBPeripheral *)peripheral // = onConnectionStateChange JAVA Ngắt kết nối với thiết bị
                   error:(NSError *)error {
     if (error) {
         NSLog(@"⚠️ Lỗi khi mất kết nối: %@", [error localizedDescription]);
@@ -1285,8 +1298,8 @@ didFailToConnectPeripheral:(CBPeripheral *)peripheral
 /// KHƯƠNG - Xử lý khi tìm thấy dịch vụ UUID đã cấu hình
 - (void) peripheral:(CBPeripheral *)peripheral
 // tìm kiếm dịch vụ UUID của BLE (MÁY) - Tìm dịch vụ glucose sau khi peripheral đã khám phá các dịch vụ.
-// ➡️ Tiếp theo sẽ đến didDiscoverCharacteristicsForService
-didDiscoverServices:(NSError *)error { // - AS onServicesDiscovered
+// didDiscoverServices  ➡️ didDiscoverCharacteristicsForService
+didDiscoverServices:(NSError *)error { // = onServicesDiscovered JAVA
     if (error) {
         Log(LERROR, @"didDiscoverServices:");
         Log(LERROR, @"  error: %@", [error localizedDescription]);
@@ -1303,50 +1316,23 @@ didDiscoverServices:(NSError *)error { // - AS onServicesDiscovered
     // KHƯƠNG
     // Tìm glucose service
     for (CBService *service in peripheral.services) {
-        NSLog(@"Service found: %@", [service.UUID UUIDString]);
         if ([service.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_SERVICE_UUID]]) {
             self.glucoseService = service;
             NSLog(@"✅ Found Glucose Service: %@", service.UUID.UUIDString);
+            // Tìm glucose measurement characteristic
+            CBCharacteristic *glucoseMeasurementCharacteristic = [self findCharacteristic:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID
+                                                                                inService:service];
+            if (glucoseMeasurementCharacteristic) {
+                // Thiết lập thông báo cho đặc tính đo glucose
+                NSData *enableNotificationValue = [NSData dataWithBytes:&(uint16_t) {
+                        0x01}                                    length:sizeof(uint16_t)];
+                [self setCharacteristicClientConfigDescriptor:peripheral
+                                               characteristic:glucoseMeasurementCharacteristic
+                                                        value:enableNotificationValue];
+            }
             break;
         }
     }
-
-//    if (glucoseService) {
-//        // 🩸 Tìm dịch vụ đo đường huyết (Glucose Service)
-//        for (CBCharacteristic *characteristic in glucoseService.characteristics) {
-//            NSLog(@"✅ Found Glucose Measurement Characteristic: %@",
-//                  characteristic.UUID.UUIDString);
-//            if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID]]) {
-////                NSLog(@"✅ Found Glucose Measurement Characteristic: %@",
-////                      characteristic.UUID.UUIDString);
-//
-//                // Thiết lập thông báo cho characteristic
-//                // Tương đương với ENABLE_NOTIFICATION_VALUE trong Android
-//                uint8_t notifyValue[] = {0x01, 0x00}; // Enable notifications
-//                NSData *notifyData = [NSData dataWithBytes:notifyValue length:sizeof(notifyValue)];
-//
-//                // Thiết lập descriptor để bật thông báo
-//                BOOL success = [self setCharacteristicClientConfigDescriptor:peripheral
-//                                                              characteristic:characteristic
-//                                                                       value:notifyData];
-//
-//                if (success) {
-//                    NSLog(@"✅ Successfully enabled notifications for Glucose Measurement");
-//                } else {
-//                    NSLog(@"❌ Failed to enable notifications for Glucose Measurement");
-//                }
-//
-//                break;
-//            }
-//        }
-//    } else {
-//        NSLog(@"❌ Glucose Service not found");
-//    }
-
-    // Khám phá các characteristics cho tất cả các services
-//    for (CBService *service in peripheral.services) {
-//        [peripheral discoverCharacteristics:nil forService:service];
-//    }
 }
 /// KHƯƠNG
 
@@ -1378,8 +1364,6 @@ didDiscoverCharacteristicsForService:(CBService *)service
         for (CBCharacteristic *characteristic in service.characteristics) {
             if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID]]) {
                 // Thiết lập thông báo cho đặc tính đo glucose
-//                [peripheral setNotifyValue:YES forCharacteristic:characteristic];
-//                break;
                 NSData *enableNotificationValue = [NSData dataWithBytes:&(uint16_t) {
                         0x01}                                    length:sizeof(uint16_t)];
                 if (![self setCharacteristicClientConfigDescriptor:peripheral characteristic:characteristic value:enableNotificationValue]) {
@@ -1469,71 +1453,7 @@ didDiscoverDescriptorsForCharacteristic:(CBCharacteristic *)characteristic
             @"error_string": error ? [error localizedDescription] : @"success",
             @"error_code": error ? @(error.code) : @(0),
     };
-    // 🩸 Tìm dịch vụ đo đường huyết (Glucose Service)
-    // Tìm lấy dịch vụ Glucose
-//    CBService *glucoseService = nil;
-//    for (CBService *service in peripheral.services) {
-//        if ([service.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_SERVICE_UUID]]) {
-//            glucoseService = service;
-//            NSLog(@"✅ Found Glucose Service: %@", service.UUID.UUIDString);
-//            break;
-//        }
-//    }
-//    if (glucoseService) {
-//        // Lấy đặc tính đo glucose
-//        CBCharacteristic *glucoseMeasurementCharacteristic = nil;
-//        for (CBCharacteristic *characteristic in glucoseService.characteristics) {
-//            if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID]]) {
-//                glucoseMeasurementCharacteristic = characteristic;
-//                // Thêm log để in thông tin
-//                NSLog(@"🩸 Found Glucose Measurement Characteristic:");
-//                NSLog(@"   - UUID: %@", characteristic.UUID.UUIDString);
-//                NSLog(@"   - Properties: %lu", (unsigned long) characteristic.properties);
-//                NSLog(@"   - Is Notifying: %@", characteristic.isNotifying ? @"YES" : @"NO");
-//
-//                // In ra các properties cụ thể
-//                if (characteristic.properties & CBCharacteristicPropertyRead)
-//                    NSLog(@"   - Can Read");
-//                if (characteristic.properties & CBCharacteristicPropertyWrite)
-//                    NSLog(@"   - Can Write");
-//                if (characteristic.properties & CBCharacteristicPropertyNotify)
-//                    NSLog(@"   - Can Notify");
-//                if (characteristic.properties & CBCharacteristicPropertyIndicate)
-//                    NSLog(@"   - Can Indicate");
-//
-//                // In ra các descriptors nếu có
-//                if (characteristic.descriptors) {
-//                    NSLog(@"   - Descriptors:");
-//                    for (CBDescriptor *descriptor in characteristic.descriptors) {
-//                        NSLog(@"     + %@", descriptor.UUID.UUIDString);
-//                    }
-//                }
-//                break;
-//            }
-//        }
-//
-//        if (glucoseMeasurementCharacteristic) {
-//            // Thiết lập thông báo cho đặc tính đo glucose
-//            [peripheral setNotifyValue:YES forCharacteristic:glucoseMeasurementCharacteristic];
-//
-//            // Gửi giá trị descriptor (thông báo)
-//            [self setCharacteristicClientConfigDescriptor:peripheral
-//                                           characteristic:glucoseMeasurementCharacteristic
-//                                                    value:[NSData dataWithBytes:&BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE length:sizeof(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)]];
-//        }
-//        if (glucoseMeasurementCharacteristic) {
-////            [peripheral setNotifyValue:YES forCharacteristic:glucoseMeasurementCharacteristic];
-//
-//            uint8_t notifyValue = 1;
-//            NSData *notifyData = [NSData dataWithBytes:&notifyValue length:sizeof(notifyValue)];
-//
-//            [self setCharacteristicClientConfigDescriptor:peripheral
-//                                           characteristic:glucoseMeasurementCharacteristic
-//                                                    value:notifyData];
-//        }
-//}
-
-// Send updated tree
+    // Send updated tree
     [self.methodChannel invokeMethod:@"OnDiscoveredServices" arguments:response];
 }
 
@@ -1553,10 +1473,10 @@ didDiscoverIncludedServicesForService:(CBService *)service
     [peripheral discoverCharacteristics:nil forService:service];
 }
 
+//KHƯƠNG - Xử lý dữ liệu đo đường huyết khi có dữ liệu đo mới
 - (void)             peripheral:(CBPeripheral *)peripheral
-didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic
+didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharacteristicChanged JAVA
                           error:(NSError *)error {
-    // this function is called on notifications as well as manual reads
     if (error) {
         Log(LERROR, @"didUpdateValueForCharacteristic:");
         Log(LERROR, @"  chr: %@", [characteristic.UUID uuidStr]);
@@ -1566,25 +1486,172 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic
         Log(LDEBUG, @"  chr: %@", [characteristic.UUID uuidStr]);
     }
 
-    CBService *primaryService = [self getPrimaryService:peripheral characteristic:characteristic];
+    if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID]]) {
+        GlucoseMeasurementRecord *glucoseMeasurementRecord = [[GlucoseMeasurementRecord alloc] init];
+        int offset = 0;
 
-    // See BmCharacteristicData
-    NSMutableDictionary *result = [@{
-            @"remote_id": [peripheral.identifier UUIDString],
-            @"service_uuid": [characteristic.service.UUID uuidStr],
-            @"characteristic_uuid": [characteristic.UUID uuidStr],
-            @"primary_service_uuid": primaryService ? [primaryService.UUID uuidStr] : [NSNull null],
-            @"value": characteristic.value,
-            @"success": error == nil ? @(1) : @(0),
-            @"error_string": error ? [error localizedDescription] : @"success",
-            @"error_code": error ? @(error.code) : @(0),
-    } mutableCopy];
+        // Get flag byte
+        uint8_t flag;
+        [characteristic.value getBytes:&flag range:NSMakeRange(offset, 1)];
+        offset += 1;
 
-    // remove if null
-    if (!primaryService) { [result removeObjectForKey:@"primary_service_uuid"]; }
+        // Get sequence number
+        uint16_t sequenceNumber;
+        [characteristic.value getBytes:&sequenceNumber range:NSMakeRange(offset, 2)];
+        glucoseMeasurementRecord.sequenceNumber = sequenceNumber;
+        offset += 2;
 
-    [self.methodChannel invokeMethod:@"OnCharacteristicReceived" arguments:result];
+        // Get base time
+        uint16_t baseTimeYear;
+        [characteristic.value getBytes:&baseTimeYear range:NSMakeRange(offset, 2)];
+        offset += 2;
+
+        uint8_t baseTimeMonth, baseTimeDay, baseTimeHours, baseTimeMinutes, baseTimeSeconds;
+        [characteristic.value getBytes:&baseTimeMonth range:NSMakeRange(offset++, 1)];
+        [characteristic.value getBytes:&baseTimeDay range:NSMakeRange(offset++, 1)];
+        [characteristic.value getBytes:&baseTimeHours range:NSMakeRange(offset++, 1)];
+        [characteristic.value getBytes:&baseTimeMinutes range:NSMakeRange(offset++, 1)];
+        [characteristic.value getBytes:&baseTimeSeconds range:NSMakeRange(offset++, 1)];
+
+        // Create calendar
+        NSCalendar *calendar = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];
+        NSDateComponents *components = [[NSDateComponents alloc] init];
+        components.year = baseTimeYear;
+        components.month = baseTimeMonth;
+        components.day = baseTimeDay;
+        components.hour = baseTimeHours;
+        components.minute = baseTimeMinutes;
+        components.second = baseTimeSeconds;
+        glucoseMeasurementRecord.calendar = [calendar dateFromComponents:components];
+
+        // Time Offset
+        if (flag & (1 << 0)) {
+            uint16_t timeOffset;
+            [characteristic.value getBytes:&timeOffset range:NSMakeRange(offset, 2)];
+            glucoseMeasurementRecord.timeOffset = timeOffset;
+            offset += 2;
+        } else {
+            glucoseMeasurementRecord.timeOffset = 0;
+        }
+
+        // Handle glucose concentration
+        if (flag & (1 << 1)) {
+            uint16_t glucoseValue;
+            [characteristic.value getBytes:&glucoseValue range:NSMakeRange(offset, 2)];
+            // Glucose concentration unit of measurement
+            if (flag & (1 << 2)) {
+                glucoseMeasurementRecord.glucoseConcentrationMeasurementUnit = GlucoseConcentrationMeasurementUnitMolesPerLitre;
+            } else {
+                glucoseMeasurementRecord.glucoseConcentrationMeasurementUnit = GlucoseConcentrationMeasurementUnitKilogramPerLitre;
+            }
+
+            glucoseMeasurementRecord.glucoseConcentrationValue = glucoseValue;
+            // Log glucose concentration value
+//            NSLog(@"📊 Glucose Concentration Value: %f", glucoseMeasurementRecord.glucoseConcentrationValue);
+//            NSLog(@"📊 Glucose Concentration Value (mg/dL): %@", [glucoseMeasurementRecord convertGlucoseConcentrationValueToMilligramsPerDeciliter]);
+
+            offset += 2;
+
+            // Get type and sample location
+            uint8_t typeAndSampleLocation;
+            [characteristic.value getBytes:&typeAndSampleLocation range:NSMakeRange(offset, 1)];
+            glucoseMeasurementRecord.type = typeAndSampleLocation >> 4;
+            glucoseMeasurementRecord.sampleLocationInteger = typeAndSampleLocation & 0x0F;
+            offset += 1;
+            NSLog(@"📊 Glucose Concentration Value: %f", glucoseMeasurementRecord.type);
+        }
+
+        // Handle sensor status
+        if (flag & (1 << 2)) {
+            uint16_t sensorStatusValue;
+            [characteristic.value getBytes:&sensorStatusValue range:NSMakeRange(offset, 2)];
+            offset += 2;
+
+            SensorStatusAnnunciation *sensorStatus = [[SensorStatusAnnunciation alloc] init];
+            sensorStatus.deviceBatteryLowAtTimeOfMeasurement = sensorStatusValue & (1 << 0);
+            sensorStatus.sensorMalfunctionAtTimeOfMeasurement = sensorStatusValue & (1 << 1);
+            sensorStatus.bloodSampleInsufficientAtTimeOfMeasurement = sensorStatusValue & (1 << 2);
+            sensorStatus.stripInsertionError = sensorStatusValue & (1 << 3);
+            sensorStatus.stripTypeIncorrectForDevice = sensorStatusValue & (1 << 4);
+            sensorStatus.sensorResultHigherThanDeviceCanProcess = sensorStatusValue & (1 << 5);
+            sensorStatus.sensorResultLowerThanTheDeviceCanProcess = sensorStatusValue & (1 << 6);
+            sensorStatus.sensorTemperatureTooHighForValidTestResult = sensorStatusValue & (1 << 7);
+            sensorStatus.sensorTemperatureTooLowForValidTestResult = sensorStatusValue & (1 << 8);
+            sensorStatus.sensorReadInterruptedBecauseStripWasPulledTooSoon =
+                    sensorStatusValue & (1 << 9);
+            sensorStatus.generalDeviceFaultHasOccurredInSensor = sensorStatusValue & (1 << 10);
+            sensorStatus.timeFaultHasOccurredInTheSensor = sensorStatusValue & (1 << 11);
+
+            glucoseMeasurementRecord.sensorStatusAnnunciation = sensorStatus;
+        }
+
+        // Send broadcast
+        [[NSNotificationCenter defaultCenter] postNotificationName:BLUETOOTH_LE_GATT_ACTION_GLUCOSE_MEASUREMENT_RECORD_AVAILABLE
+                                                            object:nil
+                                                          userInfo:@{
+                                                                  @"glucoseMeasurementRecord": glucoseMeasurementRecord}];
+        [self.glucoseMeasurementRecords addObject:glucoseMeasurementRecord];
+        [self printGlucoseMeasurementRecords];
+    } else if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID]]) {
+        // TODO: Handle glucose measurement context characteristic
+    } else if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID]]) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:RECORDS_SENT_COMPLETE
+                                                            object:nil];
+    }
 }
+
+// Phương thức in danh sách các bản ghi GlucoseMeasurementRecord
+- (void)printGlucoseMeasurementRecords {
+    if (self.glucoseMeasurementRecords.count == 0) {
+        NSLog(@"Danh sách không có bản ghi đo đường huyết nào.");
+        return;
+    }
+
+    NSLog(@"Danh sách các bản ghi đo đường huyết:");
+
+    for (GlucoseMeasurementRecord *record in self.glucoseMeasurementRecords) {
+        NSLog(@"-----------------------------------------------------");
+        NSLog(@"Số thứ tự lần đo: %d", record.sequenceNumber);
+        NSLog(@"Thời gian đo: %@", record.calendar); // hoặc format nếu cần
+
+        NSLog(@"Độ lệch thời gian (timeOffset): %d", record.timeOffset);
+
+        // In nồng độ glucose và đơn vị đo
+        if (record.glucoseConcentrationMeasurementUnit ==
+            GlucoseConcentrationMeasurementUnitMolesPerLitre) {
+            NSLog(@"Glucose concentration value: %f", record.glucoseConcentrationValue);
+            NSLog(@"Nồng độ glucose (mg/dL): %@", [record convertGlucoseConcentrationValueToMilligramsPerDeciliter]);
+
+        } else {
+            NSLog(@"Glucose concentration value: %f", record.glucoseConcentrationValue);
+
+            NSLog(@"Nồng độ glucose (mg/dL): %@", [record convertGlucoseConcentrationValueToMilligramsPerDeciliter]);
+
+        }
+        NSLog(@"Value: %.2f", record.glucoseConcentrationValue);
+        // In loại mẫu và vị trí lấy mẫu
+        NSLog(@"Loại mẫu: %d", record.type);
+        NSLog(@"Tên mẫu: %@", record.testBloodType);
+        NSLog(@"Where: %@", record.sampleLocation);
+        NSLog(@"Vị trí lấy mẫu: %d", record.sampleLocationInteger);
+
+        if (record.sensorStatusAnnunciation != nil) {
+            SensorStatusAnnunciation *sensor = record.sensorStatusAnnunciation;
+            NSLog(@"Trạng thái cảm biến:");
+            NSLog(@"Pin yếu: %@", sensor.deviceBatteryLowAtTimeOfMeasurement ? @"YES" : @"NO");
+            NSLog(@"Lỗi cảm biến: %@",
+                  sensor.sensorMalfunctionAtTimeOfMeasurement ? @"YES" : @"NO");
+            NSLog(@"Mẫu máu không đủ: %@",
+                  sensor.bloodSampleInsufficientAtTimeOfMeasurement ? @"YES" : @"NO");
+            NSLog(@"Lỗi chèn que thử: %@", sensor.stripInsertionError ? @"YES" : @"NO");
+            NSLog(@"Nhiệt độ quá cao: %@",
+                  sensor.sensorTemperatureTooHighForValidTestResult ? @"YES" : @"NO");
+            NSLog(@"Nhiệt độ quá thấp: %@",
+                  sensor.sensorTemperatureTooLowForValidTestResult ? @"YES" : @"NO");
+        }
+    }
+}
+
 
 - (void)            peripheral:(CBPeripheral *)peripheral
 didWriteValueForCharacteristic:(CBCharacteristic *)characteristic
@@ -1645,12 +1712,12 @@ didUpdateNotificationStateForCharacteristic:(CBCharacteristic *)characteristic
 
     CBService *primaryService = [self getPrimaryService:peripheral characteristic:characteristic];
 
-    // Oddly iOS does not update the CCCD descriptors when didUpdateNotificationState is called. 
+    // Oddly iOS does not update the CCCD descriptors when didUpdateNotificationState is called.
     // So instead of using characteristic.descriptors we have to manually recreate the
     // CCCD descriptor using isNotifying & characteristic.properties
     int value = 0;
     if (characteristic.isNotifying) {
-        // in iOS, if a characteristic supports both indications and notifications, 
+        // in iOS, if a characteristic supports both indications and notifications,
         // then CoreBluetooth will default to indications
         bool supportsNotify = (characteristic.properties & CBCharacteristicPropertyNotify) != 0;
         bool supportsIndicate = (characteristic.properties & CBCharacteristicPropertyIndicate) != 0;
@@ -1768,50 +1835,57 @@ didWriteValueForDescriptor:(CBDescriptor *)descriptor // = onDescriptorWrite tro
         NSLog(@"❌ Descriptor hoặc Peripheral không hợp lệ.");
         return;
     }
-    CBUUID *characteristicUUID = descriptor.characteristic.UUID;
-    NSLog(@"|||||||", descriptor.characteristic.UUID);
+    CBUUID *uuid = descriptor.characteristic.UUID;
+    NSLog(@"🔫 UUID: %@", uuid.UUIDString);
 
-//    if ([characteristicUUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID]]) {
-//        CBCharacteristic *glucoseMeasurementContextCharacteristic = [self.glucoseService
-//                characteristicWithUUID:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID]];
-//
-//        if (glucoseMeasurementContextCharacteristic) {
-//            NSData *enableNotificationValue = [NSData dataWithBytes:&(uint16_t){0x01} length:sizeof(uint16_t)];
-//            [self setCharacteristicClientConfigDescriptor:peripheral
-//                                           characteristic:glucoseMeasurementContextCharacteristic
-//                                                    value:enableNotificationValue];
-//        } else {
-//            CBCharacteristic *recordControlAccessPointCharacteristic = [self.glucoseService
-//                    characteristicWithUUID:[CBUUID UUIDWithString:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID]];
-//            NSData *enableIndicationValue = [NSData dataWithBytes:&(uint16_t){0x02} length:sizeof(uint16_t)];
-//            [self setCharacteristicClientConfigDescriptor:peripheral
-//                                           characteristic:recordControlAccessPointCharacteristic
-//                                                    value:enableIndicationValue];
-//        }
-//    }
-//    else if ([characteristicUUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID]]) {
-//        CBCharacteristic *recordAccessControlPointCharacteristic = [self.glucoseService
-//                characteristicWithUUID:[CBUUID UUIDWithString:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID]];
-//        NSData *enableIndicationValue = [NSData dataWithBytes:&(uint16_t){0x02} length:sizeof(uint16_t)];
-//        [self setCharacteristicClientConfigDescriptor:peripheral
-//                                       characteristic:recordAccessControlPointCharacteristic
-//                                                value:enableIndicationValue];
-//    }
-//    else if ([characteristicUUID isEqual:[CBUUID UUIDWithString:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID]]) {
-//        NSLog(@"✅ Indication đã được thiết lập cho Record Access Control Point.");
-//        CBCharacteristic *racp = [peripheral.services.firstObject
-//                characteristicWithUUID:[CBUUID UUIDWithString:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID]];
-//
-//        if (racp) {
-//            uint8_t opCode = OP_CODE_REPORT_STORED_RECORDS;
-//            uint8_t operator = OPERATOR_ALL_RECORDS;
-//            NSMutableData *command = [NSMutableData data];
-//            [command appendBytes:&opCode length:sizeof(opCode)];
-//            [command appendBytes:&operator length:sizeof(operator)];
-//
-//            [peripheral writeValue:command forCharacteristic:racp type:CBCharacteristicWriteWithResponse];
-//        }
-//    }
+    if ([uuid isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CHARACTERISTIC_UUID]]) {
+        CBCharacteristic *glucoseMeasurementContextCharacteristic = [self findCharacteristic:GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID inService:self.glucoseService];
+
+        // 1️⃣ Nếu là đặc tính đo glucose, tiếp tục bật Notify cho Glucose Measurement Context (nếu có)
+        if (glucoseMeasurementContextCharacteristic) {
+            NSLog(@"🔹 Bật Notify cho Glucose Measurement Context");
+
+            NSData *enableNotificationValue = [NSData dataWithBytes:&(uint16_t) {
+                    0x01}                                    length:sizeof(uint16_t)];
+            [self setCharacteristicClientConfigDescriptor:peripheral
+                                           characteristic:glucoseMeasurementContextCharacteristic
+                                                    value:enableNotificationValue];
+        } else {
+            NSLog(@"⚠️ Không tìm thấy Glucose Measurement Context, bật Indicate cho Record Access Control Point");
+            CBCharacteristic *recordControlAccessPointCharacteristic = [self findCharacteristic:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID inService:self.glucoseService];
+            NSData *enableIndicationValue = [NSData dataWithBytes:&(uint16_t) {
+                    0x02}                                  length:sizeof(uint16_t)];
+            [self setCharacteristicClientConfigDescriptor:peripheral
+                                           characteristic:recordControlAccessPointCharacteristic
+                                                    value:enableIndicationValue];
+        }
+    }
+        // 2️⃣ Nếu là Glucose Measurement Context, tiếp tục bật Indicate cho Record Access Control Point
+    else if ([uuid isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID]]) {
+        NSLog(@"🔹 Bật Indicate cho Record Access Control Point");
+
+        CBCharacteristic *recordAccessControlPointCharacteristic = [self findCharacteristic:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID inService:self.glucoseService];
+
+        NSData *enableIndicationValue = [NSData dataWithBytes:&(uint16_t) {
+                0x02}                                  length:sizeof(uint16_t)];
+        [self setCharacteristicClientConfigDescriptor:peripheral
+                                       characteristic:recordAccessControlPointCharacteristic
+                                                value:enableIndicationValue];
+    }
+        // 3️⃣ Nếu đã bật Indicate cho Record Access Control Point, gửi lệnh lấy dữ liệu đo đường huyết
+    else if ([uuid isEqual:[CBUUID UUIDWithString:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID]]) {
+        NSLog(@"✅ Indication đã được thiết lập cho Record Access Control Point.");
+        CBCharacteristic *racp = [self findCharacteristic:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID inService:self.glucoseService];
+        if (racp) {
+            uint8_t opCode = OP_CODE_REPORT_STORED_RECORDS;
+            uint8_t operator = OPERATOR_ALL_RECORDS;
+            NSMutableData *command = [NSMutableData data];
+            [command appendBytes:&opCode length:sizeof(opCode)];
+            [command appendBytes:&operator length:sizeof(operator)];
+
+            [peripheral writeValue:command forCharacteristic:racp type:CBCharacteristicWriteWithResponse];
+        }
+    }
 }
 
 - (void)peripheralDidUpdateName:(CBPeripheral *)peripheral {
@@ -1863,7 +1937,7 @@ didWriteValueForDescriptor:(CBDescriptor *)descriptor // = onDescriptorWrite tro
     Log(LVERBOSE, @"peripheralIsReadyToSendWriteWithoutResponse");
 
     // peripheralIsReadyToSendWriteWithoutResponse is used to signal
-    // when a 'writeWithoutResponse' request has completed. 
+    // when a 'writeWithoutResponse' request has completed.
     // The dart code will wait for this signal, so that we don't
     // queue writes too fast, which iOS would then drop the packets.
 
@@ -1911,17 +1985,17 @@ didWriteValueForDescriptor:(CBDescriptor *)descriptor // = onDescriptorWrite tro
 }
 
 //////////////////////////////////////////////////////////////////////
-// ███    ███  ███████   ██████      
-// ████  ████  ██       ██           
-// ██ ████ ██  ███████  ██   ███     
-// ██  ██  ██       ██  ██    ██     
-// ██      ██  ███████   ██████ 
-//     
-// ██   ██  ███████  ██       ██████   ███████  ██████   ███████ 
-// ██   ██  ██       ██       ██   ██  ██       ██   ██  ██      
-// ███████  █████    ██       ██████   █████    ██████   ███████ 
-// ██   ██  ██       ██       ██       ██       ██   ██       ██ 
-// ██   ██  ███████  ███████  ██       ███████  ██   ██  ███████ 
+// ███    ███  ███████   ██████
+// ████  ████  ██       ██
+// ██ ████ ██  ███████  ██   ███
+// ██  ██  ██       ██  ██    ██
+// ██      ██  ███████   ██████
+//
+// ██   ██  ███████  ██       ██████   ███████  ██████   ███████
+// ██   ██  ██       ██       ██   ██  ██       ██   ██  ██
+// ███████  █████    ██       ██████   █████    ██████   ███████
+// ██   ██  ██       ██       ██       ██       ██   ██       ██
+// ██   ██  ███████  ███████  ██       ███████  ██   ██  ███████
 
 - (int)bmAdapterStateEnum:(CBManagerState)adapterState {
     switch (adapterState) {
@@ -2121,11 +2195,11 @@ advertisementData
 }
 
 //////////////////////////////////////////
-// ██    ██ ████████  ██  ██       ███████ 
-// ██    ██    ██     ██  ██       ██      
-// ██    ██    ██     ██  ██       ███████ 
-// ██    ██    ██     ██  ██            ██ 
-//  ██████     ██     ██  ███████  ███████ 
+// ██    ██ ████████  ██  ██       ███████
+// ██    ██    ██     ██  ██       ██
+// ██    ██    ██     ██  ██       ███████
+// ██    ██    ██     ██  ██            ██
+//  ██████     ██     ██  ███████  ███████
 
 - (bool)isAdapterOn {
     return self.centralManager.state == CBManagerStatePoweredOn;
@@ -2349,12 +2423,12 @@ filters
     //   I've seen iOS return 524 for this value. But typically it is lower.
     //   The MTU negotiated by the OS depends on iOS version.
     //
-    // For withResponse, 
-    //   iOS typically returns a constant value of 512, regardless of MTU. 
+    // For withResponse,
+    //   iOS typically returns a constant value of 512, regardless of MTU.
     //   This is because iOS will autosplit large writes
     int maxForType = (int) [peripheral maximumWriteValueLengthForType:writeType];
 
-    // In order to operate the same on both iOS & Android, we enforce a 
+    // In order to operate the same on both iOS & Android, we enforce a
     // maximum of 512, which is the same as android. This is also the
     // maxAttrLen of a characteristic in the BLE specification.
     return MIN(maxForType, 512);

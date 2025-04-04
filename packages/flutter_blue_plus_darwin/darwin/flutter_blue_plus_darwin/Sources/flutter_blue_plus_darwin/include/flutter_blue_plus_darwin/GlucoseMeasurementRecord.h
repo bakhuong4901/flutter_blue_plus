@@ -3,8 +3,8 @@
 
 typedef NS_ENUM(NSInteger, GlucoseConcentrationMeasurementUnit
 ) {
-GlucoseConcentrationMeasurementUnitMolesPerLitre,
-GlucoseConcentrationMeasurementUnitKilogramPerLitre
+GlucoseConcentrationMeasurementUnitMolesPerLitre, // "mol/L"
+GlucoseConcentrationMeasurementUnitKilogramPerLitre // "kg/L"
 };
 
 @interface GlucoseMeasurementRecord : NSObject <NSCoding, NSSecureCoding>
@@ -21,6 +21,6 @@ GlucoseConcentrationMeasurementUnitKilogramPerLitre
 @property(nonatomic, strong) SensorStatusAnnunciation *sensorStatusAnnunciation;
 //// Chuyển đổi giá trị nồng độ glucose sang mg/dL
 
-- (NSString *)convertGlucoseConcentrationValueToMilligramsPerDeciliter;
+- (float)convertGlucoseConcentrationValueToMilligramsPerDeciliter;
 
 @end

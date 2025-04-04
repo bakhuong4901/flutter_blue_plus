@@ -2434,7 +2434,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
             }
 
             // Gọi hàm để in ra danh sách các bản ghi đã xử lý
-//            printGlucoseMeasurementRecords();
+            printGlucoseMeasurementRecords();
 
             sendGlucoseRecordToFlutter(glucoseMeasurementRecords);
             //KHƯƠNG
