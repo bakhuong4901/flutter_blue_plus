@@ -11,7 +11,9 @@
              glucoseConcentrationValue:(float)value
                                   type:(NSInteger)type
                  sampleLocationInteger:(NSInteger)sampleLocationInteger
-              sensorStatusAnnunciation:(nullable NSNumber *)status {
+              sensorStatusAnnunciation:(nullable NSNumber
+
+*)status {
     self = [super init];
     if (self) {
         _sequenceNumber = sequenceNumber;
@@ -31,12 +33,15 @@
 
 // Phương thức chuyển đổi nồng độ glucose sang mg/dL
 - (NSString *)convertGlucoseConcentrationValueToMilligramsPerDeciliter {
-    return [NSString stringWithFormat:@"%.0f mg/dL", self.glucoseConcentrationValue * 100000];
+    return [NSString stringWithFormat:@"%.0f mg/dL", self.glucoseConcentrationValue];
 
 }
 
 // Cập nhật loại máu và vị trí mẫu
 - (void)updateTestBloodTypeAndSampleLocation {
+    NSLog(@"Updating test blood type and sample location");
+    NSLog(@"Type: %ld", (long) self.type);
+    NSLog(@"Sample Location Integer: %ld", (long) self.sampleLocationInteger);
     switch (self.type) {
         case 0:
             _testBloodType = @"Reserved for future use";
@@ -99,6 +104,8 @@
             _sampleLocation = @"Reserved for future use";
             break;
     }
+    NSLog(@"Test Blood Type: %@", _testBloodType);
+    NSLog(@"Sample Location: %@", _sampleLocation);
 }
 
 // Phương thức mã hóa đối tượng để truyền qua các activity khác

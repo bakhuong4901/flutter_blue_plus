@@ -1493,18 +1493,18 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
         // Get flag byte
         uint8_t flag;
         [characteristic.value getBytes:&flag range:NSMakeRange(offset, 1)];
-        offset += 1;
+        offset += 1; // offset is 1
 
         // Get sequence number
         uint16_t sequenceNumber;
         [characteristic.value getBytes:&sequenceNumber range:NSMakeRange(offset, 2)];
         glucoseMeasurementRecord.sequenceNumber = sequenceNumber;
-        offset += 2;
+        offset += 2;  // offset is 3
 
         // Get base time
         uint16_t baseTimeYear;
         [characteristic.value getBytes:&baseTimeYear range:NSMakeRange(offset, 2)];
-        offset += 2;
+        offset += 2; // offset is 5
 
         uint8_t baseTimeMonth, baseTimeDay, baseTimeHours, baseTimeMinutes, baseTimeSeconds;
         [characteristic.value getBytes:&baseTimeMonth range:NSMakeRange(offset++, 1)];
@@ -1529,7 +1529,7 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
             uint16_t timeOffset;
             [characteristic.value getBytes:&timeOffset range:NSMakeRange(offset, 2)];
             glucoseMeasurementRecord.timeOffset = timeOffset;
-            offset += 2;
+            offset += 2; // offset is 12
         } else {
             glucoseMeasurementRecord.timeOffset = 0;
         }
@@ -1537,35 +1537,32 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
         // Handle glucose concentration
         if (flag & (1 << 1)) {
             uint16_t glucoseValue;
-            [characteristic.value getBytes:&glucoseValue range:NSMakeRange(offset, 2)];
+            [characteristic.value getBytes:&glucoseValue range:NSMakeRange(offset, 1)];
+
             // Glucose concentration unit of measurement
             if (flag & (1 << 2)) {
-                glucoseMeasurementRecord.glucoseConcentrationMeasurementUnit = GlucoseConcentrationMeasurementUnitMolesPerLitre;
+                glucoseMeasurementRecord.glucoseConcentrationMeasurementUnit = MOLES_PER_LITRE;
             } else {
-                glucoseMeasurementRecord.glucoseConcentrationMeasurementUnit = GlucoseConcentrationMeasurementUnitKilogramPerLitre;
+                glucoseMeasurementRecord.glucoseConcentrationMeasurementUnit = KILOGRAM_PER_LITRE;
             }
 
             glucoseMeasurementRecord.glucoseConcentrationValue = glucoseValue;
-            // Log glucose concentration value
-//            NSLog(@"📊 Glucose Concentration Value: %f", glucoseMeasurementRecord.glucoseConcentrationValue);
-//            NSLog(@"📊 Glucose Concentration Value (mg/dL): %@", [glucoseMeasurementRecord convertGlucoseConcentrationValueToMilligramsPerDeciliter]);
 
-            offset += 2;
+            offset += 2; // offset is 14
 
             // Get type and sample location
             uint8_t typeAndSampleLocation;
             [characteristic.value getBytes:&typeAndSampleLocation range:NSMakeRange(offset, 1)];
             glucoseMeasurementRecord.type = typeAndSampleLocation >> 4;
             glucoseMeasurementRecord.sampleLocationInteger = typeAndSampleLocation & 0x0F;
-            offset += 1;
-            NSLog(@"📊 Glucose Concentration Value: %f", glucoseMeasurementRecord.type);
+            offset += 1; // offset is 15
         }
 
         // Handle sensor status
         if (flag & (1 << 2)) {
             uint16_t sensorStatusValue;
             [characteristic.value getBytes:&sensorStatusValue range:NSMakeRange(offset, 2)];
-            offset += 2;
+            offset += 2; // offset is 16 or 12 or 9
 
             SensorStatusAnnunciation *sensorStatus = [[SensorStatusAnnunciation alloc] init];
             sensorStatus.deviceBatteryLowAtTimeOfMeasurement = sensorStatusValue & (1 << 0);
@@ -1598,6 +1595,8 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
         [[NSNotificationCenter defaultCenter] postNotificationName:RECORDS_SENT_COMPLETE
                                                             object:nil];
     }
+
+
 }
 
 // Phương thức in danh sách các bản ghi GlucoseMeasurementRecord
@@ -1618,17 +1617,18 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
 
         // In nồng độ glucose và đơn vị đo
         if (record.glucoseConcentrationMeasurementUnit ==
-            GlucoseConcentrationMeasurementUnitMolesPerLitre) {
-            NSLog(@"Glucose concentration value: %f", record.glucoseConcentrationValue);
-            NSLog(@"Nồng độ glucose (mg/dL): %@", [record convertGlucoseConcentrationValueToMilligramsPerDeciliter]);
+                MOLES_PER_LITRE) {
+            NSLog(@"Nồng độ glucose : %@",
+                  [record convertGlucoseConcentrationValueToMilligramsPerDeciliter]);
 
         } else {
-            NSLog(@"Glucose concentration value: %f", record.glucoseConcentrationValue);
+//            NSLog(@"Glucose concentration value: %f", record.glucoseConcentrationValue);
 
-            NSLog(@"Nồng độ glucose (mg/dL): %@", [record convertGlucoseConcentrationValueToMilligramsPerDeciliter]);
+            NSLog(@"Nồng độ glucose : %@",
+                  [record convertGlucoseConcentrationValueToMilligramsPerDeciliter]);
 
         }
-        NSLog(@"Value: %.2f", record.glucoseConcentrationValue);
+        NSLog(@"Value: %.0f", record.glucoseConcentrationValue);
         // In loại mẫu và vị trí lấy mẫu
         NSLog(@"Loại mẫu: %d", record.type);
         NSLog(@"Tên mẫu: %@", record.testBloodType);
