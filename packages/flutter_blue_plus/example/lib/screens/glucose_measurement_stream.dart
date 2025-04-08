@@ -23,12 +23,11 @@ class GlucoseMeasurementStream {
     print("GlucoseMeasurementStream initialized"); // Debug print
     _channel.setMethodCallHandler((call) async {
       if (call.method == "OnGlucoseRecordsReceived") {
-        print("Raw data received: ${call.arguments}");
-
+        // print("Raw data received: ${call.arguments}");
         final Map<String, dynamic> mappedData =
             Map<String, dynamic>.from(call.arguments as Map);
         final response = BmGlucoseRecordResponse.fromMap(mappedData);
-        print("Parsed response: $response");
+        // print("Parsed response: $response");
 
         _glucoseController.add(response);
       }

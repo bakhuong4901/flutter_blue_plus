@@ -19,8 +19,9 @@ KILOGRAM_PER_LITRE // "kg/L"
 @property(nonatomic, strong) NSString *testBloodType;
 @property(nonatomic, strong) NSString *sampleLocation;
 @property(nonatomic, strong) SensorStatusAnnunciation *sensorStatusAnnunciation;
-//// Chuyển đổi giá trị nồng độ glucose sang mg/dL
 
 - (NSString *)convertGlucoseConcentrationValueToMilligramsPerDeciliter;
+
+- (void)updateTestBloodTypeAndSampleLocation;
 
 @end

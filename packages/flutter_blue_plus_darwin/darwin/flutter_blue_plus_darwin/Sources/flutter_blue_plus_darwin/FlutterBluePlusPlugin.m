@@ -1556,6 +1556,8 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
             glucoseMeasurementRecord.type = typeAndSampleLocation >> 4;
             glucoseMeasurementRecord.sampleLocationInteger = typeAndSampleLocation & 0x0F;
             offset += 1; // offset is 15
+            [glucoseMeasurementRecord updateTestBloodTypeAndSampleLocation];
+
         }
 
         // Handle sensor status
@@ -1588,16 +1590,76 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
                                                           userInfo:@{
                                                                   @"glucoseMeasurementRecord": glucoseMeasurementRecord}];
         [self.glucoseMeasurementRecords addObject:glucoseMeasurementRecord];
-        [self printGlucoseMeasurementRecords];
     } else if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID]]) {
         // TODO: Handle glucose measurement context characteristic
     } else if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID]]) {
         [[NSNotificationCenter defaultCenter] postNotificationName:RECORDS_SENT_COMPLETE
                                                             object:nil];
     }
-
+    [self printGlucoseMeasurementRecords];
+    [self sendGlucoseRecordsToFlutter:self.glucoseMeasurementRecords];
 
 }
+
+// Gửi dữ liệu GlucoseMeasurementRecord qua Method Channel
+- (void)sendGlucoseRecordsToFlutter:(NSArray
+
+<GlucoseMeasurementRecord *> *)records {
+    NSMutableArray *glucoseMeasurementList = [NSMutableArray array];
+
+    for (GlucoseMeasurementRecord *record in records) {
+        NSMutableDictionary *glucoseData = [NSMutableDictionary dictionary];
+        NSCalendar *calendar = [NSCalendar currentCalendar];
+        NSDateComponents *components = [calendar components:(NSCalendarUnitYear |
+                                                             NSCalendarUnitMonth |
+                                                             NSCalendarUnitDay |
+                                                             NSCalendarUnitHour |
+                                                             NSCalendarUnitMinute |
+                                                             NSCalendarUnitSecond)
+                                                   fromDate:record.calendar];
+
+        glucoseData[@"sequenceNumber"] = @(record.sequenceNumber);
+        glucoseData[@"baseTimeYear"] = @(components.year);
+        glucoseData[@"baseTimeMonth"] = @(components.month - 1); // Java-style: tháng bắt đầu từ 0
+        glucoseData[@"baseTimeDay"] = @(components.day);
+        glucoseData[@"baseTimeHours"] = @(components.hour);
+        glucoseData[@"baseTimeMinutes"] = @(components.minute);
+        glucoseData[@"baseTimeSeconds"] = @(components.second);
+        glucoseData[@"timeOffset"] = @(record.timeOffset);
+
+        glucoseData[@"measurementUnit"] =
+                record.glucoseConcentrationMeasurementUnit == MOLES_PER_LITRE ? @"MOLES_PER_LITRE"
+                                                                              : @"KILOGRAM_PER_LITRE";
+        glucoseData[@"glucoseConcentrationValue"] = @(record.glucoseConcentrationValue);
+
+        glucoseData[@"type"] = @(record.type);
+        glucoseData[@"testBloodType"] = record.testBloodType;
+        glucoseData[@"sampleLocation"] = record.sampleLocation ?: @"";
+        glucoseData[@"sampleLocationInteger"] = @(record.sampleLocationInteger);
+
+        if (record.sensorStatusAnnunciation) {
+            NSMutableDictionary *sensorStatus = [NSMutableDictionary dictionary];
+            sensorStatus[@"batteryLow"] = @(record.sensorStatusAnnunciation.deviceBatteryLowAtTimeOfMeasurement);
+            sensorStatus[@"sensorMalfunction"] = @(record.sensorStatusAnnunciation.sensorMalfunctionAtTimeOfMeasurement);
+            sensorStatus[@"insufficientBloodSample"] = @(record.sensorStatusAnnunciation.bloodSampleInsufficientAtTimeOfMeasurement);
+            sensorStatus[@"stripInsertionError"] = @(record.sensorStatusAnnunciation.stripInsertionError);
+            sensorStatus[@"stripTypeIncorrect"] = @(record.sensorStatusAnnunciation.stripTypeIncorrectForDevice);
+            sensorStatus[@"resultHigherThanProcessable"] = @(record.sensorStatusAnnunciation.sensorResultHigherThanDeviceCanProcess);
+            sensorStatus[@"resultLowerThanProcessable"] = @(record.sensorStatusAnnunciation.sensorResultLowerThanTheDeviceCanProcess);
+
+            glucoseData[@"sensorStatus"] = sensorStatus;
+        }
+
+        [glucoseMeasurementList addObject:glucoseData];
+    }
+
+    NSDictionary * glucoseDataRecords = @{@"glucoseDataRecords": glucoseMeasurementList};
+
+    // Gửi về Flutter
+    [self.methodChannel invokeMethod:@"OnGlucoseRecordsReceived" arguments:glucoseDataRecords];
+
+}
+
 
 // Phương thức in danh sách các bản ghi GlucoseMeasurementRecord
 - (void)printGlucoseMeasurementRecords {
@@ -1617,19 +1679,20 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
 
         // In nồng độ glucose và đơn vị đo
         if (record.glucoseConcentrationMeasurementUnit ==
-                MOLES_PER_LITRE) {
+            MOLES_PER_LITRE) {
             NSLog(@"Nồng độ glucose : %@",
                   [record convertGlucoseConcentrationValueToMilligramsPerDeciliter]);
 
         } else {
-//            NSLog(@"Glucose concentration value: %f", record.glucoseConcentrationValue);
 
             NSLog(@"Nồng độ glucose : %@",
                   [record convertGlucoseConcentrationValueToMilligramsPerDeciliter]);
 
         }
         NSLog(@"Value: %.0f", record.glucoseConcentrationValue);
-        // In loại mẫu và vị trí lấy mẫu
+        NSLog(@"Đơn vị đo: %@",
+              record.glucoseConcentrationMeasurementUnit == MOLES_PER_LITRE ? @"MOLES_PER_LITRE"
+                                                                            : @"KILOGRAM_PER_LITRE");    // In loại mẫu và vị trí lấy mẫu
         NSLog(@"Loại mẫu: %d", record.type);
         NSLog(@"Tên mẫu: %@", record.testBloodType);
         NSLog(@"Where: %@", record.sampleLocation);

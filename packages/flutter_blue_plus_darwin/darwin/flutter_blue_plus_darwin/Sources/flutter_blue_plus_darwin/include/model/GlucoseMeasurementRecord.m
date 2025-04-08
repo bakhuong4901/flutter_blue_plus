@@ -24,7 +24,9 @@
         _type = type;
         _sampleLocationInteger = sampleLocationInteger;
         _sensorStatusAnnunciation = status;
-
+        // Gán giá trị mặc định giống Java
+        _testBloodType = @"Capillary Whole blood";
+        _sampleLocation = @"Earlobe";
         // Xử lý kiểu máu và vị trí mẫu
         [self updateTestBloodTypeAndSampleLocation];
     }
@@ -39,9 +41,6 @@
 
 // Cập nhật loại máu và vị trí mẫu
 - (void)updateTestBloodTypeAndSampleLocation {
-    NSLog(@"Updating test blood type and sample location");
-    NSLog(@"Type: %ld", (long) self.type);
-    NSLog(@"Sample Location Integer: %ld", (long) self.sampleLocationInteger);
     switch (self.type) {
         case 0:
             _testBloodType = @"Reserved for future use";
@@ -104,8 +103,6 @@
             _sampleLocation = @"Reserved for future use";
             break;
     }
-    NSLog(@"Test Blood Type: %@", _testBloodType);
-    NSLog(@"Sample Location: %@", _sampleLocation);
 }
 
 // Phương thức mã hóa đối tượng để truyền qua các activity khác
@@ -143,7 +140,8 @@
                                    type:type
                   sampleLocationInteger:sampleLocationInteger
                sensorStatusAnnunciation:sensorStatusAnnunciation];
-
+    // ⚠️ Thêm dòng này để cập nhật testBloodType và sampleLocation
+    [self updateTestBloodTypeAndSampleLocation];
     return self;
 }
 

@@ -2391,6 +2391,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                     glucoseMeasurementRecord.type = typeAndSampleLocation >> 4;
                     glucoseMeasurementRecord.sampleLocationInteger = typeAndSampleLocation & 0x0F;
                     offset += 1; // offset is 15
+                    glucoseMeasurementRecord.initializeBloodTypeAndLocation();
                 }
 
                 // 🔔 Trạng thái cảm biến
@@ -2458,6 +2459,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 glucoseData.put("glucoseConcentrationValue", record.glucoseConcentrationValue);
                 // Nếu có thông tin về loại mẫu máu và vị trí lấy mẫu
                 glucoseData.put("type", record.type);
+                glucoseData.put("testBloodType", record.testBloodType);
                 glucoseData.put("sampleLocation", record.sampleLocation);
                 glucoseData.put("sampleLocationInteger", record.sampleLocationInteger);
                 // Thêm trạng thái cảm biến nếu có
@@ -2502,6 +2504,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 // In nồng độ glucose và đơn vị đo
                 System.out.println("Nồng độ glucose: " + (record.glucoseConcentrationMeasurementUnit == GlucoseMeasurementRecord.GlucoseConcentrationMeasurementUnit.MOLES_PER_LITRE ? record.convertGlucoseConcentrationValueToMilligramsPerDeciliter() : record.convertGlucoseConcentrationValueToMilligramsPerDeciliter()));
                 System.out.println("Value: " + record.glucoseConcentrationValue);
+                System.out.println("Đơn vị: " + record.glucoseConcentrationMeasurementUnit);
 
                 // In loại mẫu và vị trí lấy mẫu
                 System.out.println("Loại mẫu: " + record.type);

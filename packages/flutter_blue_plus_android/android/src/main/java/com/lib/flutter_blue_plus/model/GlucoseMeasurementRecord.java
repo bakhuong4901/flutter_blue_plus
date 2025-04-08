@@ -35,7 +35,7 @@ public class GlucoseMeasurementRecord implements Parcelable {
     }
 
 
-    private void initializeBloodTypeAndLocation() {
+    public void initializeBloodTypeAndLocation() {
         switch (type) {
             case 0:
                 testBloodType = "Reserved for future use"; // Dùng cho mục đích sau này
@@ -126,8 +126,7 @@ public class GlucoseMeasurementRecord implements Parcelable {
         sampleLocation = in.readString();
         sensorStatusAnnunciation = (SensorStatusAnnunciation) in.readSerializable();
         glucoseConcentrationMeasurementUnit = (GlucoseConcentrationMeasurementUnit) in.readSerializable();
-        //FIX
-//        glucoseConcentrationMeasurementUnit = GlucoseConcentrationMeasurementUnit.valueOf(in.readString());
+
 
     }
 
@@ -158,10 +157,8 @@ public class GlucoseMeasurementRecord implements Parcelable {
         dest.writeInt(sampleLocationInteger);
         dest.writeString(testBloodType);
         dest.writeString(sampleLocation);
-        dest.writeParcelable(sensorStatusAnnunciation,flags);
+        dest.writeParcelable(sensorStatusAnnunciation, flags);
         dest.writeSerializable(glucoseConcentrationMeasurementUnit);
-        //FIX
-//        dest.writeString(glucoseConcentrationMeasurementUnit.name());
 
     }
 }
