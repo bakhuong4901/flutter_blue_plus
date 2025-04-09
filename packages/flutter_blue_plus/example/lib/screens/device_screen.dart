@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus_library.dart';
 import 'package:flutter_blue_plus_example/model/glucose_measurement_record_model.dart';
 import 'package:flutter_blue_plus_example/screens/glucose_measurement_stream.dart';
+import 'package:flutter_blue_plus_example/widgets/convert_glucose.dart';
 
 import '../widgets/service_tile.dart';
 import '../widgets/characteristic_tile.dart';
@@ -47,8 +48,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _glucoseRecordResponseSubscription =
         _glucoseStream.glucoseStream.listen((records) {
       setState(() {
-        print('AHIHI${records.listGlucoseMeasurementRecord}');
-        listGlucoseMeasurementRecord = records.listGlucoseMeasurementRecord;
+        listGlucoseMeasurementRecord = records.listGlucoseMeasurementRecord.reversed.toList();
       });
     });
 
@@ -306,11 +306,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
               Container(
                 height: 500,
                 child: ListView.builder(
-                    itemCount: listGlucoseMeasurementRecord.length,
-                    itemBuilder: (context, index) {
-                      final record = listGlucoseMeasurementRecord[index];
-                      return Text('${record.glucoseConcentrationValue}');
-                    }),
+                  itemCount: listGlucoseMeasurementRecord.length,
+                  itemBuilder: (context, index) {
+                    final record = listGlucoseMeasurementRecord[index];
+                    return Text(
+                        '${convertToMgPerDl(record.glucoseConcentrationValue!, record.glucoseConcentrationMeasurementUnit!, 0)}'
+                        '  -  ${record.hours}: ${record.minutes}:${record.seconds} ${record.day}/${record.month}/${record.year}');
+                  },
+                ),
               )
             ],
           ),

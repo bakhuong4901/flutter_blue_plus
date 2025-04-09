@@ -1620,7 +1620,7 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
 
         glucoseData[@"sequenceNumber"] = @(record.sequenceNumber);
         glucoseData[@"baseTimeYear"] = @(components.year);
-        glucoseData[@"baseTimeMonth"] = @(components.month - 1); // Java-style: tháng bắt đầu từ 0
+        glucoseData[@"baseTimeMonth"] = @(components.month);
         glucoseData[@"baseTimeDay"] = @(components.day);
         glucoseData[@"baseTimeHours"] = @(components.hour);
         glucoseData[@"baseTimeMinutes"] = @(components.minute);
@@ -1630,7 +1630,8 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
         glucoseData[@"measurementUnit"] =
                 record.glucoseConcentrationMeasurementUnit == MOLES_PER_LITRE ? @"MOLES_PER_LITRE"
                                                                               : @"KILOGRAM_PER_LITRE";
-        glucoseData[@"glucoseConcentrationValue"] = @(record.glucoseConcentrationValue);
+//        glucoseData[@"glucoseConcentrationValue"] = @(record.glucoseConcentrationValue);
+        glucoseData[@"glucoseConcentrationValue"] = @((float)record.glucoseConcentrationValue / 100000.0f);
 
         glucoseData[@"type"] = @(record.type);
         glucoseData[@"testBloodType"] = record.testBloodType;
@@ -1646,6 +1647,11 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
             sensorStatus[@"stripTypeIncorrect"] = @(record.sensorStatusAnnunciation.stripTypeIncorrectForDevice);
             sensorStatus[@"resultHigherThanProcessable"] = @(record.sensorStatusAnnunciation.sensorResultHigherThanDeviceCanProcess);
             sensorStatus[@"resultLowerThanProcessable"] = @(record.sensorStatusAnnunciation.sensorResultLowerThanTheDeviceCanProcess);
+            sensorStatus[@"temperatureTooHigh"] = @(record.sensorStatusAnnunciation.sensorTemperatureTooHighForValidTestResult);
+            sensorStatus[@"temperatureTooLow"] = @(record.sensorStatusAnnunciation.sensorTemperatureTooLowForValidTestResult);
+            sensorStatus[@"readInterrupted"] = @(record.sensorStatusAnnunciation.sensorReadInterruptedBecauseStripWasPulledTooSoon);
+            sensorStatus[@"generalDeviceFault"] = @(record.sensorStatusAnnunciation.generalDeviceFaultHasOccurredInSensor);
+            sensorStatus[@"timeFault"] = @(record.sensorStatusAnnunciation.timeFaultHasOccurredInTheSensor);
 
             glucoseData[@"sensorStatus"] = sensorStatus;
         }
@@ -1673,7 +1679,8 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
     for (GlucoseMeasurementRecord *record in self.glucoseMeasurementRecords) {
         NSLog(@"-----------------------------------------------------");
         NSLog(@"Số thứ tự lần đo: %d", record.sequenceNumber);
-        NSLog(@"Thời gian đo: %@", record.calendar); // hoặc format nếu cần
+        NSLog(@"Thời gian đo: %@", record.calendar); // cái này đang trả ra hiển thị trên UI flutter đúng với bên Android
+        // còn hiển thị log ở đây là sẽ lệch 7h so với bên JAVA nhưng cái này là đúng với flutter vì chỉ là hiển thị ra log thôi nhoá 😂
 
         NSLog(@"Độ lệch thời gian (timeOffset): %d", record.timeOffset);
 
@@ -1689,7 +1696,7 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
                   [record convertGlucoseConcentrationValueToMilligramsPerDeciliter]);
 
         }
-        NSLog(@"Value: %.0f", record.glucoseConcentrationValue);
+        NSLog(@"Value: %0.f", record.glucoseConcentrationValue);
         NSLog(@"Đơn vị đo: %@",
               record.glucoseConcentrationMeasurementUnit == MOLES_PER_LITRE ? @"MOLES_PER_LITRE"
                                                                             : @"KILOGRAM_PER_LITRE");    // In loại mẫu và vị trí lấy mẫu
@@ -1707,10 +1714,18 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
             NSLog(@"Mẫu máu không đủ: %@",
                   sensor.bloodSampleInsufficientAtTimeOfMeasurement ? @"YES" : @"NO");
             NSLog(@"Lỗi chèn que thử: %@", sensor.stripInsertionError ? @"YES" : @"NO");
+            NSLog(@"Loại dải không đúng cho thiết bị: %@", sensor.stripTypeIncorrectForDevice ? @"YES" : @"NO");
+            NSLog(@"Cảm biến kết quả cao hơn thiết bị có thể xử lý: %@", sensor.sensorResultHigherThanDeviceCanProcess ? @"YES" : @"NO");
+            NSLog(@"Cảm biến kết quả thấp hơn thiết bị có thể xử lý: %@", sensor.sensorResultLowerThanTheDeviceCanProcess ? @"YES" : @"NO");
             NSLog(@"Nhiệt độ quá cao: %@",
                   sensor.sensorTemperatureTooHighForValidTestResult ? @"YES" : @"NO");
-            NSLog(@"Nhiệt độ quá thấp: %@",
-                  sensor.sensorTemperatureTooLowForValidTestResult ? @"YES" : @"NO");
+            NSLog(@"Nhiệt độ quá thấp: %@", sensor.sensorTemperatureTooLowForValidTestResult ? @"YES" : @"NO");
+            NSLog(@"Cảm biến đọc bị gián đoạn Vì Dải Đã Được Kéo Quá Sớm: %@",
+                  sensor.sensorReadInterruptedBecauseStripWasPulledTooSoon ? @"YES" : @"NO");
+            NSLog(@"Lỗi thiết bị chung đã xảy ra trong cảm biến: %@",
+                  sensor.generalDeviceFaultHasOccurredInSensor ? @"YES" : @"NO");
+            NSLog(@"Thời gian Lỗi đã xảy ra trong cảm biến: %@",
+                  sensor.timeFaultHasOccurredInTheSensor ? @"YES" : @"NO");
         }
     }
 }

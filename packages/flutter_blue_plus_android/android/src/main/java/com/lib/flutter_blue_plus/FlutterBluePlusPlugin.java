@@ -2096,6 +2096,9 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
         // Quản lý kết nối với các thiết bị BLE
+        // Đấy là thứ tự để chạy các hàm rồi kết nối, xử lý bật thông báo hoặc indicator rồi ghi các thuộc tính
+        // rồi lấy dữ liệu gửi qua method channel lên UI Flutter
+        // 😎 1️⃣
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             try {
                 // Prevent callback thread & method call thread from writing to
@@ -2235,6 +2238,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
         }
 
         // KHƯƠNG (Giống với setCharacteristicClientConfigDescriptor of SUGAIOT)
+        // 😎 3️⃣.1️⃣
         private boolean setCharacteristicClientConfigDescriptor(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value) {
             //🔹 1. Kích hoạt thông báo cho đặc tính (Bật Notify/Indicate)
             gatt.setCharacteristicNotification(characteristic, true);
@@ -2250,6 +2254,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
 
         // KHƯƠNG
+        // 😎 2️⃣
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
@@ -2334,6 +2339,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
         @Override
         @TargetApi(33) // newer function with byte[] value argument
         // 🐷 XỬ LÝ DỮ LIỆU ĐƯỜNG HUYẾT CỦA MÁY 🐷
+        // 😎 4️⃣
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value) {
             // this callback is only for notifications & indications - lệnh gọi lại này chỉ dành cho thông báo và chỉ dẫn
             LogLevel level = LogLevel.DEBUG;
@@ -2472,6 +2478,11 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                     sensorStatus.put("stripTypeIncorrect", record.sensorStatusAnnunciation.stripTypeIncorrectForDevice);
                     sensorStatus.put("resultHigherThanProcessable", record.sensorStatusAnnunciation.sensorResultHigherThanDeviceCanProcess);
                     sensorStatus.put("resultLowerThanProcessable", record.sensorStatusAnnunciation.sensorResultLowerThanTheDeviceCanProcess);
+                    sensorStatus.put("temperatureTooHigh", record.sensorStatusAnnunciation.sensorTemperatureTooHighForValidTestResult);
+                    sensorStatus.put("temperatureTooLow", record.sensorStatusAnnunciation.sensorTemperatureTooLowForValidTestResult);
+                    sensorStatus.put("readInterrupted", record.sensorStatusAnnunciation.sensorReadInterruptedBecauseStripWasPulledTooSoon);
+                    sensorStatus.put("generalDeviceFault", record.sensorStatusAnnunciation.generalDeviceFaultHasOccurredInSensor);
+                    sensorStatus.put("timeFault", record.sensorStatusAnnunciation.timeFaultHasOccurredInTheSensor);
                     //
                     glucoseData.put("sensorStatus", sensorStatus);
                 }
@@ -2520,8 +2531,14 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                     System.out.println("Lỗi cảm biến: " + sensorStatus.sensorMalfunctionAtTimeOfMeasurement);
                     System.out.println("Mẫu máu không đủ: " + sensorStatus.bloodSampleInsufficientAtTimeOfMeasurement);
                     System.out.println("Lỗi chèn que thử: " + sensorStatus.stripInsertionError);
+                    System.out.println("Loại dải không đúng cho thiết bị : " + sensorStatus.stripTypeIncorrectForDevice);
+                    System.out.println("Cảm biến kết quả cao hơn thiết bị có thể xử lý: " + sensorStatus.sensorResultHigherThanDeviceCanProcess);
+                    System.out.println("Cảm biến kết quả thấp hơn thiết bị có thể xử lý: " + sensorStatus.sensorResultLowerThanTheDeviceCanProcess);
                     System.out.println("Nhiệt độ quá cao: " + sensorStatus.sensorTemperatureTooHighForValidTestResult);
                     System.out.println("Nhiệt độ quá thấp: " + sensorStatus.sensorTemperatureTooLowForValidTestResult);
+                    System.out.println("cảm biến đọc bị gián đoạn Vì Dải Đã Được Kéo Quá Sớm: " + sensorStatus.sensorReadInterruptedBecauseStripWasPulledTooSoon);
+                    System.out.println("Lỗi thiết bị chung đã xảy ra trong cảm biến: " + sensorStatus.generalDeviceFaultHasOccurredInSensor);
+                    System.out.println("thời gian Lỗi đã xảy ra trong cảm biến: " + sensorStatus.timeFaultHasOccurredInTheSensor);
                 }
             }
         }
@@ -2614,6 +2631,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
         }
 
         // Ghi Descript để nhận diện dữ liệu
+        // 😎 3️⃣
         @Override
         public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
             // Nếu status == 0 (tương đương với BluetoothGatt.GATT_SUCCESS)

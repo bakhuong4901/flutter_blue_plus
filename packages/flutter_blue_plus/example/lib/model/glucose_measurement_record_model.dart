@@ -5,19 +5,20 @@ class SensorStatusAnnunciation {
 
 //Model data sau khi nhận từ Native gửi qua method channel
 class GlucoseMeasurementRecord {
-  int? sequenceNumber;
+  int? sequenceNumber; // thứ tự lần đo
   int? year;
   int? month;
   int? day;
   int? hours;
   int? minutes;
   int? seconds;
-  int? timeOffset;
-  String? glucoseConcentrationMeasurementUnit;
-  double? glucoseConcentrationValue;
+  int? timeOffset; // độ lệch thời gian
+  String? glucoseConcentrationMeasurementUnit; // đơn vị đo
+  double? glucoseConcentrationValue; // giá trị đo
   int? type;
-  int? sampleLocationInteger;
-  String? sampleLocation;
+  String? testBloodType; // loại mẫu
+  int? sampleLocationInteger; // Vị trí lấy mẫu (số)
+  String? sampleLocation; // Tên vị trí lấy mẫu
   SensorStatusAnnunciation? sensorStatusAnnunciation;
 
   factory GlucoseMeasurementRecord.fromMap(Map<String, dynamic> json) {
@@ -37,6 +38,8 @@ class GlucoseMeasurementRecord {
           ? json['glucoseConcentrationValue']
           : null,
       type: json['type'] != null ? json['type'] : null,
+      testBloodType:
+          json['testBloodType'] != null ? json['testBloodType'] : null,
       sampleLocationInteger: json['sampleLocationInteger'] != null
           ? json['sampleLocationInteger']
           : null,
@@ -57,6 +60,7 @@ class GlucoseMeasurementRecord {
     this.glucoseConcentrationMeasurementUnit,
     this.glucoseConcentrationValue,
     this.type,
+    this.testBloodType,
     this.sampleLocationInteger,
     this.sampleLocation,
     this.sensorStatusAnnunciation,

@@ -29,6 +29,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
     _scanResultsSubscription = FlutterBluePlus.scanResults.listen((results) {
       _scanResults = results;
+      // xử lý ở đây nếu cần hiển thị 1 thiết bị
       if (mounted) {
         setState(() {});
       }
@@ -64,11 +65,14 @@ class _ScanScreenState extends State<ScanScreen> {
     }
     try {
       await FlutterBluePlus.startScan(
-        timeout: const Duration(seconds: 15),
-        withServices: [
-          Guid("00001808-0000-1000-8000-00805f9b34fb"),
-        ],
-      );
+          timeout: const Duration(seconds: 15),
+          withServices: [
+            Guid("00001808-0000-1000-8000-00805f9b34fb"),
+          ],
+          withRemoteIds: [
+            'E05CB1C8-CD74-08FE-SEBB-AF19938F240E',
+            'DB:90:78:2:88:7D'
+          ]);
     } catch (e, backtrace) {
       Snackbar.show(ABC.b, prettyException("Start Scan Error:", e),
           success: false);
