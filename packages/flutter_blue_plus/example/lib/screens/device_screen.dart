@@ -48,7 +48,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _glucoseRecordResponseSubscription =
         _glucoseStream.glucoseStream.listen((records) {
       setState(() {
-        listGlucoseMeasurementRecord = records.listGlucoseMeasurementRecord.reversed.toList();
+        listGlucoseMeasurementRecord =
+            records.listGlucoseMeasurementRecord.reversed.toList();
       });
     });
 
@@ -310,8 +311,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   itemBuilder: (context, index) {
                     final record = listGlucoseMeasurementRecord[index];
                     return Text(
-                        '${convertToMgPerDl(record.glucoseConcentrationValue!, record.glucoseConcentrationMeasurementUnit!, 0)}'
-                        '  -  ${record.hours}: ${record.minutes}:${record.seconds} ${record.day}/${record.month}/${record.year}');
+                        '${convertToMgPerDl(record.glucoseConcentrationValue!, record.glucoseConcentrationMeasurementUnit!)}'
+                        '  - '
+                        // '${record.hours}: ${record.minutes}:${record.seconds}'
+                        ' ${formattedTime(record.hours!, record.minutes!)} '
+                        '${record.day}/${record.month}/${record.year}');
                   },
                 ),
               )

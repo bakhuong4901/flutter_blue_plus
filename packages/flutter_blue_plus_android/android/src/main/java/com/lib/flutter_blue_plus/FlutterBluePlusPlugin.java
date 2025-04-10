@@ -2457,7 +2457,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 glucoseData.put("baseTimeYear", record.calendar.get(Calendar.YEAR));
                 glucoseData.put("baseTimeMonth", record.calendar.get(Calendar.MONTH)); // Tháng bắt đầu từ 0
                 glucoseData.put("baseTimeDay", record.calendar.get(Calendar.DAY_OF_MONTH));
-                glucoseData.put("baseTimeHours", record.calendar.get(Calendar.HOUR));
+                glucoseData.put("baseTimeHours", record.calendar.get(Calendar.HOUR_OF_DAY));
                 glucoseData.put("baseTimeMinutes", record.calendar.get(Calendar.MINUTE));
                 glucoseData.put("baseTimeSeconds", record.calendar.get(Calendar.SECOND));
                 glucoseData.put("timeOffset", record.timeOffset);
@@ -2510,6 +2510,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 System.out.println("-----------------------------------------------------");
                 System.out.println("Số thứ tự lần đo: " + record.sequenceNumber);
                 System.out.println("Thời gian đo: " + record.calendar.getTime().toString());
+                System.out.println("Thời gian đo: " + record.calendar);
                 System.out.println("Độ lệch thời gian (timeOffset): " + record.timeOffset);
 
                 // In nồng độ glucose và đơn vị đo
