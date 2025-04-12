@@ -2432,6 +2432,37 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
             } else if (GlucoseProfileConfiguration.GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
                 // Todo, get characteristic value of the glucose measurement context characteristic
                 // Lấy các giá trị đặc tính
+                // Cho biết là trước khi ăn hoặc sau khi ăn hoặc không xác định
+                byte[] data = characteristic.getValue();
+                if (data != null && data.length >= 5) {
+                    // Byte 1–2 là Sequence Number
+                    int contextSequenceNumber = ((data[1] & 0xFF) | ((data[2] & 0xFF) << 8));
+                    // Byte thứ 5 (index 4) là thông tin bữa ăn
+                    int mealByte = data[4] & 0xFF;
+                    String mealInfo;
+                    switch (mealByte) {
+                        case 0x01:
+                            mealInfo = "Trước khi ăn";
+                            break;
+                        case 0x02:
+                            mealInfo = "Sau khi ăn";
+                            break;
+                        case 0x03:
+                            mealInfo = "Khi đói";
+                            break;
+                        default:
+                            mealInfo = "Không xác định";
+                            break;
+                    }
+                    // Tìm đúng GlucoseMeasurementRecord theo sequenceNumber
+                    for (GlucoseMeasurementRecord record : glucoseMeasurementRecords) {
+                        if (record.sequenceNumber == contextSequenceNumber) {
+                            record.mealInfo = mealInfo;
+                            log(LogLevel.DEBUG, "Gán mealInfo cho record #" + contextSequenceNumber + ": " + mealInfo);
+                            break;
+                        }
+                    }
+                }
 
             } else if (GlucoseProfileConfiguration.RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
                 log(LogLevel.DEBUG, "📡 Nhận dữ liệu đo đường huyết...");
@@ -2517,6 +2548,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 System.out.println("Nồng độ glucose: " + (record.glucoseConcentrationMeasurementUnit == GlucoseMeasurementRecord.GlucoseConcentrationMeasurementUnit.MOLES_PER_LITRE ? record.convertGlucoseConcentrationValueToMilligramsPerDeciliter() : record.convertGlucoseConcentrationValueToMilligramsPerDeciliter()));
                 System.out.println("Value: " + record.glucoseConcentrationValue);
                 System.out.println("Đơn vị: " + record.glucoseConcentrationMeasurementUnit);
+                System.out.println("MEAL: " + record.mealInfo);
 
                 // In loại mẫu và vị trí lấy mẫu
                 System.out.println("Loại mẫu: " + record.type);

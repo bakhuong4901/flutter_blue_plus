@@ -18,6 +18,7 @@ public class GlucoseMeasurementRecord implements Parcelable {
     public int sampleLocationInteger;
     public String testBloodType;
     public String sampleLocation;
+    public String mealInfo; // ✅ Thêm thông tin bữa ăn
     public SensorStatusAnnunciation sensorStatusAnnunciation;
 
     public GlucoseMeasurementRecord() {
@@ -30,6 +31,7 @@ public class GlucoseMeasurementRecord implements Parcelable {
         this.sampleLocationInteger = 0;  // Vị trí lấy mẫu (Ví dụ: ngón tay, dái tai...).
         this.testBloodType = "Capillary Whole blood";  // Chuỗi chứa loại máu đo (cập nhật dựa vào type).
         this.sampleLocation = "Earlobe"; // Chuỗi chứa vị trí lấy mẫu (cập nhật dựa vào sampleLocationInteger).
+        this.mealInfo = ""; // ✅ Mặc định
         this.sensorStatusAnnunciation = null; // Trạng thái của cảm biến đo (có thể null nếu không có dữ liệu).
         initializeBloodTypeAndLocation();
     }
@@ -126,6 +128,7 @@ public class GlucoseMeasurementRecord implements Parcelable {
         sampleLocation = in.readString();
         sensorStatusAnnunciation = (SensorStatusAnnunciation) in.readSerializable();
         glucoseConcentrationMeasurementUnit = (GlucoseConcentrationMeasurementUnit) in.readSerializable();
+        mealInfo = in.readString(); // ✅ Đọc từ Parcel
 
 
     }
@@ -159,6 +162,8 @@ public class GlucoseMeasurementRecord implements Parcelable {
         dest.writeString(sampleLocation);
         dest.writeParcelable(sensorStatusAnnunciation, flags);
         dest.writeSerializable(glucoseConcentrationMeasurementUnit);
+        dest.writeString(mealInfo); // ✅ Ghi vào Parcel
+
 
     }
 }
