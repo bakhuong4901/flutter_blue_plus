@@ -19,6 +19,7 @@ KILOGRAM_PER_LITRE // "kg/L"
 @property(nonatomic, strong) NSString *testBloodType;
 @property(nonatomic, strong) NSString *sampleLocation;
 @property(nonatomic, strong) SensorStatusAnnunciation *sensorStatusAnnunciation;
+@property(nonatomic, strong) NSString *mealInfo;
 
 - (NSString *)convertGlucoseConcentrationValueToMilligramsPerDeciliter;
 

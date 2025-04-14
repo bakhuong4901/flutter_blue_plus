@@ -27,6 +27,7 @@
         // Gán giá trị mặc định giống Java
         _testBloodType = @"Capillary Whole blood";
         _sampleLocation = @"Earlobe";
+        _mealInfo = @"Không xác định";
         // Xử lý kiểu máu và vị trí mẫu
         [self updateTestBloodTypeAndSampleLocation];
     }
@@ -117,6 +118,7 @@
     [coder encodeObject:self.testBloodType forKey:@"testBloodType"];
     [coder encodeObject:self.sampleLocation forKey:@"sampleLocation"];
     [coder encodeObject:self.sensorStatusAnnunciation forKey:@"sensorStatusAnnunciation"];
+    [coder encodeObject:self.mealInfo forKey:@"mealInfo"];
 }
 
 // Phương thức giải mã đối tượng
@@ -131,6 +133,7 @@
     NSString *testBloodType = [coder decodeObjectForKey:@"testBloodType"];
     NSString *sampleLocation = [coder decodeObjectForKey:@"sampleLocation"];
     NSNumber *sensorStatusAnnunciation = [coder decodeObjectForKey:@"sensorStatusAnnunciation"];
+    NSNumber *mealInfo = [coder decodeObjectForKey:@"mealInfo"];
 
     self = [self initWithSequenceNumber:sequenceNumber
                                calendar:calendar

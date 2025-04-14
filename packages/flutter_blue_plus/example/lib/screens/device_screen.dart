@@ -315,7 +315,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                         '  - '
                         // '${record.hours}: ${record.minutes}:${record.seconds}'
                         ' ${formattedTime(record.hours!, record.minutes!)} '
-                        '${record.day}/${record.month}/${record.year}');
+                        '${record.day}/${record.month}/${record.year} \n ${record.mealInfo}');
                   },
                 ),
               )

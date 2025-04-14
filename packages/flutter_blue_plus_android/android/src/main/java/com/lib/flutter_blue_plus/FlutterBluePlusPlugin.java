@@ -2469,11 +2469,10 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
 
                 bluetoothGattStateIntent.setAction(BluetoothGattStateInformationReceiver.RECORDS_SENT_COMPLETE);
                 localBroadcastManager.sendBroadcast(bluetoothGattStateIntent);
+                // Gọi hàm để in ra danh sách các bản ghi đã xử lý
+                printGlucoseMeasurementRecords();
+
             }
-
-            // Gọi hàm để in ra danh sách các bản ghi đã xử lý
-            printGlucoseMeasurementRecords();
-
             sendGlucoseRecordToFlutter(glucoseMeasurementRecords);
             //KHƯƠNG
         }
@@ -2499,6 +2498,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 glucoseData.put("testBloodType", record.testBloodType);
                 glucoseData.put("sampleLocation", record.sampleLocation);
                 glucoseData.put("sampleLocationInteger", record.sampleLocationInteger);
+                glucoseData.put("mealInfo", record.mealInfo);
                 // Thêm trạng thái cảm biến nếu có
                 if (record.sensorStatusAnnunciation != null) {
                     HashMap<String, Boolean> sensorStatus = new HashMap<>();
@@ -2541,7 +2541,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
                 System.out.println("-----------------------------------------------------");
                 System.out.println("Số thứ tự lần đo: " + record.sequenceNumber);
                 System.out.println("Thời gian đo: " + record.calendar.getTime().toString());
-                System.out.println("Thời gian đo: " + record.calendar);
+//                System.out.println("Thời gian đo: " + record.calendar);
                 System.out.println("Độ lệch thời gian (timeOffset): " + record.timeOffset);
 
                 // In nồng độ glucose và đơn vị đo

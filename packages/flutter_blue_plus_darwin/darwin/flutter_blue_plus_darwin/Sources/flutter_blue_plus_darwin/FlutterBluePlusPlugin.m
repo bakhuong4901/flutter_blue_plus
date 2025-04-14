@@ -1591,7 +1591,43 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
                                                                   @"glucoseMeasurementRecord": glucoseMeasurementRecord}];
         [self.glucoseMeasurementRecords addObject:glucoseMeasurementRecord];
     } else if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:GLUCOSE_MEASUREMENT_CONTEXT_CHARACTERISTIC_UUID]]) {
+        // xử lý thông tin để biết là trước khi ăn, sau khi ăn, nhịn đói và không xác định.
         // TODO: Handle glucose measurement context characteristic
+        NSData *data = characteristic.value;
+        if (data != nil && data.length >= 5) {
+            const uint8_t *bytes = (const uint8_t *)data.bytes;
+
+            // Byte 1–2 là Sequence Number (Little Endian)
+            int contextSequenceNumber = bytes[1] | (bytes[2] << 8);
+
+            // Byte thứ 5 (index 4) là thông tin bữa ăn
+            uint8_t mealByte = bytes[4];
+            NSString *mealInfo;
+
+            switch (mealByte) {
+                case 0x01:
+                    mealInfo = @"Trước khi ăn";
+                    break;
+                case 0x02:
+                    mealInfo = @"Sau khi ăn";
+                    break;
+                case 0x03:
+                    mealInfo = @"Khi đói";
+                    break;
+                default:
+                    mealInfo = @"Không xác định";
+                    break;
+            }
+
+            // Tìm đúng GlucoseMeasurementRecord theo sequenceNumber
+            for (GlucoseMeasurementRecord *record in self.glucoseMeasurementRecords) {
+                if (record.sequenceNumber == contextSequenceNumber) {
+                    record.mealInfo = mealInfo;
+                    NSLog(@"[DEBUG] Gán mealInfo cho record #%d: %@", contextSequenceNumber, mealInfo);
+                    break;
+                }
+            }
+        }
     } else if ([characteristic.UUID isEqual:[CBUUID UUIDWithString:RECORD_ACCESS_CONTROL_POINT_CHARACTERISTIC_UUID]]) {
         [[NSNotificationCenter defaultCenter] postNotificationName:RECORDS_SENT_COMPLETE
                                                             object:nil];
@@ -1637,6 +1673,7 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
         glucoseData[@"testBloodType"] = record.testBloodType;
         glucoseData[@"sampleLocation"] = record.sampleLocation ?: @"";
         glucoseData[@"sampleLocationInteger"] = @(record.sampleLocationInteger);
+        glucoseData[@"mealInfo"] = record.mealInfo;
 
         if (record.sensorStatusAnnunciation) {
             NSMutableDictionary *sensorStatus = [NSMutableDictionary dictionary];
@@ -1703,6 +1740,7 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
         NSLog(@"Loại mẫu: %d", record.type);
         NSLog(@"Tên mẫu: %@", record.testBloodType);
         NSLog(@"Where: %@", record.sampleLocation);
+        NSLog(@"MEAL: %@", record.mealInfo);
         NSLog(@"Vị trí lấy mẫu: %d", record.sampleLocationInteger);
 
         if (record.sensorStatusAnnunciation != nil) {

@@ -73,6 +73,7 @@ class GlucoseMeasurementRecord {
   int? sampleLocationInteger; // Vị trí lấy mẫu (số)
   String? sampleLocation; // Tên vị trí lấy mẫu
   SensorStatusAnnunciation? sensorStatusAnnunciation;
+  String? mealInfo;
 
   factory GlucoseMeasurementRecord.fromMap(Map<String, dynamic> json) {
     return GlucoseMeasurementRecord(
@@ -102,6 +103,7 @@ class GlucoseMeasurementRecord {
           ? SensorStatusAnnunciation.fromMap(
               Map<String, dynamic>.from(json['sensorStatusAnnunciation']))
           : null,
+      mealInfo: json['mealInfo'],
     );
   }
 
@@ -121,6 +123,7 @@ class GlucoseMeasurementRecord {
     this.sampleLocationInteger,
     this.sampleLocation,
     this.sensorStatusAnnunciation,
+    this.mealInfo,
   });
 }
 
