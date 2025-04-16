@@ -83,7 +83,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Future onStopPressed() async {
     try {
-      FlutterBluePlus.stopScan();
+       FlutterBluePlus.stopScan();
     } catch (e, backtrace) {
       Snackbar.show(ABC.b, prettyException("Stop Scan Error:", e),
           success: false);

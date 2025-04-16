@@ -1173,6 +1173,7 @@ advertisementData
     [self.methodChannel invokeMethod:@"OnScanResponse" arguments:response];
 }
 
+// 😎 1️⃣
 - (void)centralManager:(CBCentralManager *)central
 //KHƯƠNG Khi thiết bị BLE kết nối thành công.
   didConnectPeripheral:(CBPeripheral *)peripheral { // = onConnectionStateChange JAVA Kết nối thành công
@@ -1204,6 +1205,7 @@ advertisementData
     [self.methodChannel invokeMethod:@"OnConnectionStateChanged" arguments:result];
 }
 
+// 😎 1️⃣.1️⃣
 - (void) centralManager:(CBCentralManager *)central
 // Khi thiết bị BLE bị ngắt kết nối.
 didDisconnectPeripheral:(CBPeripheral *)peripheral // = onConnectionStateChange JAVA Ngắt kết nối với thiết bị
@@ -1296,6 +1298,7 @@ didFailToConnectPeripheral:(CBPeripheral *)peripheral
 // ██████   ███████  ███████  ███████   ██████   ██   ██     ██     ███████ 
 
 /// KHƯƠNG - Xử lý khi tìm thấy dịch vụ UUID đã cấu hình
+// 😎 2️⃣
 - (void) peripheral:(CBPeripheral *)peripheral
 // tìm kiếm dịch vụ UUID của BLE (MÁY) - Tìm dịch vụ glucose sau khi peripheral đã khám phá các dịch vụ.
 // didDiscoverServices  ➡️ didDiscoverCharacteristicsForService
@@ -1341,6 +1344,7 @@ didDiscoverServices:(NSError *)error { // = onServicesDiscovered JAVA
 - (void)                  peripheral:(CBPeripheral *)peripheral
 // Lấy danh sách các đặc tính (characteristics) của dịch vụ BLE.
 // Khi đặc tính được phát hiện, nó tìm đặc tính đo glucose và bật thông báo (setNotifyValue:YES).
+// 😎 2️⃣.1️⃣
 didDiscoverCharacteristicsForService:(CBService *)service
                                error:(NSError *)error {
     if (error) {
@@ -1474,6 +1478,7 @@ didDiscoverIncludedServicesForService:(CBService *)service
 }
 
 //KHƯƠNG - Xử lý dữ liệu đo đường huyết khi có dữ liệu đo mới
+// 😎 4️⃣
 - (void)             peripheral:(CBPeripheral *)peripheral
 didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharacteristicChanged JAVA
                           error:(NSError *)error {
@@ -1595,7 +1600,7 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
         // TODO: Handle glucose measurement context characteristic
         NSData *data = characteristic.value;
         if (data != nil && data.length >= 5) {
-            const uint8_t *bytes = (const uint8_t *)data.bytes;
+            const uint8_t *bytes = (const uint8_t *) data.bytes;
 
             // Byte 1–2 là Sequence Number (Little Endian)
             int contextSequenceNumber = bytes[1] | (bytes[2] << 8);
@@ -1623,7 +1628,8 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
             for (GlucoseMeasurementRecord *record in self.glucoseMeasurementRecords) {
                 if (record.sequenceNumber == contextSequenceNumber) {
                     record.mealInfo = mealInfo;
-                    NSLog(@"[DEBUG] Gán mealInfo cho record #%d: %@", contextSequenceNumber, mealInfo);
+                    NSLog(@"[DEBUG] Gán mealInfo cho record #%d: %@", contextSequenceNumber,
+                          mealInfo);
                     break;
                 }
             }
@@ -1667,7 +1673,8 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
                 record.glucoseConcentrationMeasurementUnit == MOLES_PER_LITRE ? @"MOLES_PER_LITRE"
                                                                               : @"KILOGRAM_PER_LITRE";
 //        glucoseData[@"glucoseConcentrationValue"] = @(record.glucoseConcentrationValue);
-        glucoseData[@"glucoseConcentrationValue"] = @((float)record.glucoseConcentrationValue / 100000.0f);
+        glucoseData[@"glucoseConcentrationValue"] = @((float) record.glucoseConcentrationValue /
+                                                      100000.0f);
 
         glucoseData[@"type"] = @(record.type);
         glucoseData[@"testBloodType"] = record.testBloodType;
@@ -1716,7 +1723,8 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
     for (GlucoseMeasurementRecord *record in self.glucoseMeasurementRecords) {
         NSLog(@"-----------------------------------------------------");
         NSLog(@"Số thứ tự lần đo: %d", record.sequenceNumber);
-        NSLog(@"Thời gian đo: %@", record.calendar); // cái này đang trả ra hiển thị trên UI flutter đúng với bên Android
+        NSLog(@"Thời gian đo: %@",
+              record.calendar); // cái này đang trả ra hiển thị trên UI flutter đúng với bên Android
         // còn hiển thị log ở đây là sẽ lệch 7h so với bên JAVA nhưng cái này là đúng với flutter vì chỉ là hiển thị ra log thôi nhoá 😂
 
         NSLog(@"Độ lệch thời gian (timeOffset): %d", record.timeOffset);
@@ -1752,12 +1760,16 @@ didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic // = onCharac
             NSLog(@"Mẫu máu không đủ: %@",
                   sensor.bloodSampleInsufficientAtTimeOfMeasurement ? @"YES" : @"NO");
             NSLog(@"Lỗi chèn que thử: %@", sensor.stripInsertionError ? @"YES" : @"NO");
-            NSLog(@"Loại dải không đúng cho thiết bị: %@", sensor.stripTypeIncorrectForDevice ? @"YES" : @"NO");
-            NSLog(@"Cảm biến kết quả cao hơn thiết bị có thể xử lý: %@", sensor.sensorResultHigherThanDeviceCanProcess ? @"YES" : @"NO");
-            NSLog(@"Cảm biến kết quả thấp hơn thiết bị có thể xử lý: %@", sensor.sensorResultLowerThanTheDeviceCanProcess ? @"YES" : @"NO");
+            NSLog(@"Loại dải không đúng cho thiết bị: %@",
+                  sensor.stripTypeIncorrectForDevice ? @"YES" : @"NO");
+            NSLog(@"Cảm biến kết quả cao hơn thiết bị có thể xử lý: %@",
+                  sensor.sensorResultHigherThanDeviceCanProcess ? @"YES" : @"NO");
+            NSLog(@"Cảm biến kết quả thấp hơn thiết bị có thể xử lý: %@",
+                  sensor.sensorResultLowerThanTheDeviceCanProcess ? @"YES" : @"NO");
             NSLog(@"Nhiệt độ quá cao: %@",
                   sensor.sensorTemperatureTooHighForValidTestResult ? @"YES" : @"NO");
-            NSLog(@"Nhiệt độ quá thấp: %@", sensor.sensorTemperatureTooLowForValidTestResult ? @"YES" : @"NO");
+            NSLog(@"Nhiệt độ quá thấp: %@",
+                  sensor.sensorTemperatureTooLowForValidTestResult ? @"YES" : @"NO");
             NSLog(@"Cảm biến đọc bị gián đoạn Vì Dải Đã Được Kéo Quá Sớm: %@",
                   sensor.sensorReadInterruptedBecauseStripWasPulledTooSoon ? @"YES" : @"NO");
             NSLog(@"Lỗi thiết bị chung đã xảy ra trong cảm biến: %@",
@@ -1900,6 +1912,7 @@ didUpdateValueForDescriptor:(CBDescriptor *)descriptor
 }
 
 // Hàm ghi Descriptor để nhận dữ liệu
+// 😎 3️⃣
 - (void)        peripheral:(CBPeripheral *)peripheral
 didWriteValueForDescriptor:(CBDescriptor *)descriptor // = onDescriptorWrite trong JAVA
                      error:(NSError *)error {

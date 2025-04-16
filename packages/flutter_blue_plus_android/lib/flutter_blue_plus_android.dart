@@ -40,17 +40,6 @@ final class FlutterBluePlusAndroid extends FlutterBluePlusPlatform {
   final _onServicesResetController =
       StreamController<BmBluetoothDevice>.broadcast();
 
-  // KHƯƠNG
-  // final _onGlucoseRecordController =
-  //     StreamController<BmGlucoseRecordResponse>.broadcast();
-  //
-  // @override
-  // Stream<BmGlucoseRecordResponse> get onGlucoseRecordsReceived {
-  //   return _onGlucoseRecordController.stream;
-  // }
-
-  // KHƯƠNG
-
   @override
   Stream<BmBluetoothAdapterState> get onAdapterStateChanged {
     return _onAdapterStateChangedController.stream;
